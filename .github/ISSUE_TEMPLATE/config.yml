@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation
+    url: https://turoyt.github.io/Armature
+    about: Read the full documentation before opening an issue.

@@ -1,0 +1,151 @@
+// Armature — Prisma Schema
+// Docs: https://www.prisma.io/docs/reference/api-reference/prisma-schema-reference
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Models ──────────────────────────────────────────────────────────────────
+
+/// Application user. passwordHash is nullable to support OAuth-only accounts.
+model User {
+  id           String  @id @default(cuid())
+  email        String  @unique
+  passwordHash String?
+  firstName    String?
+  lastName     String?
+  avatarUrl    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  accounts        OAuthAccount[]
+  refreshTokens   RefreshToken[]
+  userRoles       UserRole[]
+  userPermissions UserPermission[]
+  resources       Resource[]
+
+  @@map("users")
+}
+
+/// Linked OAuth provider account — one user can connect multiple providers.
+model OAuthAccount {
+  id                String  @id @default(cuid())
+  provider          String  // "google" | "github" | ...
+  providerAccountId String  // Provider-side user ID
+  accessToken       String?
+  refreshToken      String?
+  expiresAt         Int?    // Unix timestamp
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@map("oauth_accounts")
+}
+
+/// Hashed refresh token — one user can hold multiple active sessions (multi-device).
+model RefreshToken {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+// ─── RBAC ─────────────────────────────────────────────────────────────────────
+//
+// Role-based access control — fully stored in DB.
+// Adding a new role or permission requires only a DB insert, no code change.
+//
+// Access resolution:
+//   effective permissions = union(roles[].permissions) + direct userPermissions
+
+/// Named role — e.g. "admin", "moderator", "editor".
+model Role {
+  id          String  @id @default(cuid())
+  name        String  @unique  // machine-readable slug, e.g. "admin"
+  label       String           // human-readable label, e.g. "Administrator"
+  description String?
+
+  userRoles       UserRole[]
+  rolePermissions RolePermission[]
+
+  @@map("roles")
+}
+
+/// Named capability — e.g. "users:read", "resources:delete".
+model Permission {
+  id          String  @id @default(cuid())
+  name        String  @unique  // "<resource>:<action>"
+  description String?
+
+  rolePermissions RolePermission[]
+  userPermissions UserPermission[]
+
+  @@map("permissions")
+}
+
+/// Assigns a Role to a User (many-to-many).
+model UserRole {
+  userId String
+  roleId String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+/// Assigns a Permission to a Role (many-to-many).
+model RolePermission {
+  roleId       String
+  permissionId String
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+/// Direct Permission override on a User — bypasses role assignment.
+model UserPermission {
+  userId       String
+  permissionId String
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([userId, permissionId])
+  @@map("user_permissions")
+}
+
+// ─── Example Resource ────────────────────────────────────────────────────────
+// Template module — remove this model when using Armature as your base.
+
+model Resource {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  ownerId String
+  owner   User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId])
+  @@map("resources")
+}
