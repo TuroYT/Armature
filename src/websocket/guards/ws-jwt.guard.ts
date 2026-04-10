@@ -6,9 +6,10 @@ import { ErrorCode } from '../../common/constants/error-constants.js';
 /**
  * Per-event WebSocket guard.
  *
- * Verifies that `client.data.user` was populated during `handleConnection`.
- * Use this on individual `@SubscribeMessage` handlers that require
- * an authenticated caller:
+ * Verifies that `client.data.user` was populated by the Socket.IO auth
+ * middleware registered in `WebsocketGateway.afterInit()`. Because that
+ * middleware rejects the handshake for unauthenticated clients, this guard
+ * is a safety net for handlers that need an explicit auth assertion.
  *
  * ```ts
  * @UseGuards(WsJwtGuard)
@@ -16,9 +17,9 @@ import { ErrorCode } from '../../common/constants/error-constants.js';
  * handleEvent(@WsCurrentUser() user: AuthUser) { ... }
  * ```
  *
- * Note: authentication itself (token verification) happens once in
- * `WebsocketGateway.handleConnection`. Sockets that fail auth are
- * disconnected before they can send any messages.
+ * Note: token verification itself happens once at connection time in
+ * `WebsocketGateway.afterInit()` via `server.use()`. Sockets that fail
+ * auth never reach the connected state and cannot emit or receive events.
  */
 @Injectable()
 export class WsJwtGuard implements CanActivate {

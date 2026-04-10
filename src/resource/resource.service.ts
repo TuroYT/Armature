@@ -38,13 +38,7 @@ export class ResourceService {
     });
     this.logger.log('Resource created', { resourceId: resource.id, ownerId });
     const response = serialize(ResourceResponseDto, resource);
-    void this.ws.emit('resource:created', response).catch((err: unknown) =>
-      this.logger.warn('WebSocket emit failed', {
-        event: 'resource:created',
-        error: err instanceof Error ? err.message : String(err),
-        stack: err instanceof Error ? err.stack : undefined,
-      }),
-    );
+    this.emitEvent('resource:created', response);
     return response;
   }
 
@@ -101,13 +95,7 @@ export class ResourceService {
       data: dto,
     });
     const response = serialize(ResourceResponseDto, updated);
-    void this.ws.emit('resource:updated', response).catch((err: unknown) =>
-      this.logger.warn('WebSocket emit failed', {
-        event: 'resource:updated',
-        error: err instanceof Error ? err.message : String(err),
-        stack: err instanceof Error ? err.stack : undefined,
-      }),
-    );
+    this.emitEvent('resource:updated', response);
     return response;
   }
 
@@ -120,9 +108,18 @@ export class ResourceService {
 
     await this.prisma.resource.delete({ where: { id } });
     this.logger.log('Resource deleted', { resourceId: id });
-    void this.ws.emit('resource:deleted', { id }).catch((err: unknown) =>
+    this.emitEvent('resource:deleted', { id });
+  }
+
+  /**
+   * Fire-and-forget WebSocket emit.
+   * Errors are logged but never propagate to the caller — a WS failure must
+   * not affect the REST response.
+   */
+  private emitEvent<T>(event: string, data: T): void {
+    void this.ws.emit(event, data).catch((err: unknown) =>
       this.logger.warn('WebSocket emit failed', {
-        event: 'resource:deleted',
+        event,
         error: err instanceof Error ? err.message : String(err),
         stack: err instanceof Error ? err.stack : undefined,
       }),

@@ -17,6 +17,9 @@ const socket = io('http://localhost:3000', {
 
 socket.on('connect', () => console.log('connected'));
 socket.on('disconnect', (reason) => console.log('disconnected', reason));
+// Auth failures during the handshake surface as connect_error, not error
+socket.on('connect_error', (err) => console.error('connection failed', err.message));
+// Runtime WebSocket exceptions (e.g. FORBIDDEN on subscribe)
 socket.on('error', (err) => console.error('ws error', err));
 
 // Listen for resource events (only received if the policy allows it)
@@ -38,16 +41,18 @@ const socket = io('http://localhost:3000', {
 
 ## Authentication
 
-Authentication happens **once at connection time** inside
-`WebsocketGateway.handleConnection()`.
+Authentication runs in a **Socket.IO middleware** registered in
+`WebsocketGateway.afterInit()` via `server.use()`. This means the handshake
+is rejected **before** the connection is established — unauthenticated sockets
+never enter the connected state and cannot emit or receive any events.
 
-1. The gateway reads the JWT from `handshake.auth.token` (preferred) or the
+1. The middleware reads the JWT from `handshake.auth.token` (preferred) or the
    `Authorization: Bearer <token>` header.
 2. The token is verified with `JwtService` using `JWT_SECRET`.
 3. On success the decoded user (`{ id, email, roles }`) is stored in
-   `client.data.user` for the lifetime of the socket.
-4. On failure (missing, expired, or invalid token) the socket is **immediately
-   disconnected**. No events can be sent or received.
+   `socket.data.user` for the lifetime of the socket.
+4. On failure (missing, expired, or invalid token) the handshake is **rejected
+   immediately** — the client receives a `connect_error` event (not `error`).
 
 The global `JwtAuthGuard` used by the REST API is HTTP-only and does **not**
 apply to WebSocket connections.

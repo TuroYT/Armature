@@ -34,7 +34,10 @@ async function bootstrap() {
   // ── Middleware ────────────────────────────────────────────────────────────
   app.use(cookieParser());
   app.enableCors({
-    origin: corsOrigin ?? '*',
+    // When CORS_ORIGIN is unset, reflect the request origin (true) instead of
+    // '*' — browsers reject credentialed requests with a wildcard origin.
+    // This matches the behaviour of WsAdapter when no origin is configured.
+    origin: corsOrigin ?? true,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   });

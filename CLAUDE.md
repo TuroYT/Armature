@@ -116,8 +116,8 @@ See `src/resource/resource.ws-policy.ts` for the full example.
 ### WS auth flow
 
 - Token passed in `handshake.auth.token` (preferred) or `Authorization: Bearer` header
-- Global `JwtAuthGuard` is HTTP-only — WS auth happens in `handleConnection()`
-- Invalid/missing token → immediate disconnect
+- Global `JwtAuthGuard` is HTTP-only — WS auth happens in a `server.use()` middleware registered in `afterInit()`
+- Invalid/missing token → handshake rejected before connection is established (client receives `connect_error`)
 
 ---
 
