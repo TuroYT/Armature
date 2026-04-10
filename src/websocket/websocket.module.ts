@@ -53,7 +53,12 @@ import type { Env } from '../config/env.validation.js';
       }),
     }),
   ],
-  providers: [WsPolicyRegistry, WebsocketGateway, WsExceptionFilter, WsJwtGuard],
+  providers: [
+    WsPolicyRegistry,
+    WebsocketGateway,
+    WsExceptionFilter,
+    WsJwtGuard,
+  ],
   exports: [WebsocketGateway, WsPolicyRegistry, WsJwtGuard, WsExceptionFilter],
 })
 export class WebsocketModule {}

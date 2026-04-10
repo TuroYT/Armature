@@ -36,8 +36,7 @@ export class WsExceptionFilter extends BaseWsExceptionFilter {
 
     if (exception instanceof WsException) {
       const error = exception.getError();
-      const code =
-        typeof error === 'string' ? error : ErrorCode.BAD_REQUEST;
+      const code = typeof error === 'string' ? error : ErrorCode.BAD_REQUEST;
       client.emit('error', {
         code,
         message: this.i18n.translate(code as ErrorCode, locale),
@@ -46,8 +45,7 @@ export class WsExceptionFilter extends BaseWsExceptionFilter {
     }
 
     this.logger.error('Unhandled WebSocket exception', {
-      error:
-        exception instanceof Error ? exception.message : String(exception),
+      error: exception instanceof Error ? exception.message : String(exception),
       stack: exception instanceof Error ? exception.stack : undefined,
     });
 

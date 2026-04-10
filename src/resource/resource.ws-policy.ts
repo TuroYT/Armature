@@ -55,16 +55,14 @@ export class ResourceWsPolicy implements OnModuleInit {
     // ── resource:deleted ────────────────────────────────────────────────────
     // The deleted payload only carries `{ id }`, so ownership can't be checked
     // without a DB lookup — restrict to admins by default.
-    this.registry.register<{ id: string }>(
-      'resource:deleted',
-      (user) => user.roles.includes('admin'),
+    this.registry.register<{ id: string }>('resource:deleted', (user) =>
+      user.roles.includes('admin'),
     );
 
     // ── Room: 'resources' ───────────────────────────────────────────────────
     // Only admins may subscribe to the shared 'resources' room.
-    this.registry.registerRoomPolicy(
-      'resources',
-      (user) => user.roles.includes('admin'),
+    this.registry.registerRoomPolicy('resources', (user) =>
+      user.roles.includes('admin'),
     );
   }
 }

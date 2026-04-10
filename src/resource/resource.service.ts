@@ -39,7 +39,10 @@ export class ResourceService {
     this.logger.log('Resource created', { resourceId: resource.id, ownerId });
     const response = serialize(ResourceResponseDto, resource);
     void this.ws.emit('resource:created', response).catch((err: unknown) =>
-      this.logger.warn('WebSocket emit failed', { event: 'resource:created', error: err }),
+      this.logger.warn('WebSocket emit failed', {
+        event: 'resource:created',
+        error: err,
+      }),
     );
     return response;
   }
@@ -98,7 +101,10 @@ export class ResourceService {
     });
     const response = serialize(ResourceResponseDto, updated);
     void this.ws.emit('resource:updated', response).catch((err: unknown) =>
-      this.logger.warn('WebSocket emit failed', { event: 'resource:updated', error: err }),
+      this.logger.warn('WebSocket emit failed', {
+        event: 'resource:updated',
+        error: err,
+      }),
     );
     return response;
   }
@@ -113,7 +119,10 @@ export class ResourceService {
     await this.prisma.resource.delete({ where: { id } });
     this.logger.log('Resource deleted', { resourceId: id });
     void this.ws.emit('resource:deleted', { id }).catch((err: unknown) =>
-      this.logger.warn('WebSocket emit failed', { event: 'resource:deleted', error: err }),
+      this.logger.warn('WebSocket emit failed', {
+        event: 'resource:deleted',
+        error: err,
+      }),
     );
   }
 }
