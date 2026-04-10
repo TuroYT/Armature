@@ -24,7 +24,7 @@ import { ErrorCode } from '../../common/constants/error-constants.js';
 export class WsJwtGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const client = context.switchToWs().getClient<Socket>();
-    if (!client.data.user) {
+    if (!(client.data as { user?: unknown }).user) {
       throw new WsException(ErrorCode.UNAUTHORIZED);
     }
     return true;

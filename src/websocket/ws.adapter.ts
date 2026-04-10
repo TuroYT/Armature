@@ -1,7 +1,7 @@
 import { IoAdapter } from '@nestjs/platform-socket.io';
 import { ConfigService } from '@nestjs/config';
 import type { INestApplication } from '@nestjs/common';
-import type { ServerOptions } from 'socket.io';
+import { type Server, type ServerOptions } from 'socket.io';
 import type { Env } from '../config/env.validation.js';
 
 /**
@@ -23,13 +23,13 @@ export class WsAdapter extends IoAdapter {
     this.corsOrigin = config.get('CORS_ORIGIN', { infer: true });
   }
 
-  override createIOServer(port: number, options?: ServerOptions) {
+  override createIOServer(port: number, options?: ServerOptions): Server {
     return super.createIOServer(port, {
       ...options,
       cors: {
         origin: this.corsOrigin ?? '*',
         credentials: true,
       },
-    });
+    }) as Server;
   }
 }

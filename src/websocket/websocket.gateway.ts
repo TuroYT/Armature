@@ -102,17 +102,17 @@ export class WebsocketGateway
         client.disconnect();
         return;
       }
-      client.data.user = {
+      (client.data as { user: AuthUser }).user = {
         id: payload.sub,
         email: payload.email,
         roles: payload.roles,
-      } satisfies AuthUser;
+      };
     } catch {
       client.disconnect();
     }
   }
 
-  handleDisconnect(_client: Socket): void {
+  handleDisconnect(): void {
     // Override to add teardown logic (e.g. presence tracking).
   }
 
@@ -139,7 +139,7 @@ export class WebsocketGateway
     const sockets = await this.server.fetchSockets();
     await Promise.all(
       sockets.map(async (socket) => {
-        const user = socket.data.user as AuthUser | undefined;
+        const user = (socket.data as { user?: AuthUser }).user;
         if (user && (await policy(user, data))) {
           socket.emit(event, data);
         }
@@ -166,7 +166,7 @@ export class WebsocketGateway
     const sockets = await this.server.in(room).fetchSockets();
     await Promise.all(
       sockets.map(async (socket) => {
-        const user = socket.data.user as AuthUser | undefined;
+        const user = (socket.data as { user?: AuthUser }).user;
         if (user && (await policy(user, data))) {
           socket.emit(event, data);
         }

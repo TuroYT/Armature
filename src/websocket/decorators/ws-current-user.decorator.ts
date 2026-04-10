@@ -18,6 +18,6 @@ import type { AuthUser } from '../../auth/strategies/jwt.strategy.js';
 export const WsCurrentUser = createParamDecorator(
   (_data: unknown, ctx: ExecutionContext): AuthUser => {
     const client = ctx.switchToWs().getClient<Socket>();
-    return client.data.user as AuthUser;
+    return (client.data as { user: AuthUser }).user;
   },
 );
