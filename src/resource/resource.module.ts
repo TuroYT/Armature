@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ResourceService } from './resource.service.js';
 import { ResourceController } from './resource.controller.js';
+import { ResourceWsPolicy } from './resource.ws-policy.js';
+import { WebsocketModule } from '../websocket/websocket.module.js';
 
 /**
  * Example resource module — demonstrates all Armature conventions.
@@ -8,7 +10,8 @@ import { ResourceController } from './resource.controller.js';
  * using Armature as your project base.
  */
 @Module({
+  imports: [WebsocketModule],
   controllers: [ResourceController],
-  providers: [ResourceService],
+  providers: [ResourceService, ResourceWsPolicy],
 })
 export class ResourceModule {}

@@ -6,6 +6,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
 import { readFileSync } from 'fs';
 import { AppModule } from './app.module.js';
+import { WsAdapter } from './websocket/ws.adapter.js';
 import type { Env } from './config/env.validation.js';
 
 function getPackageVersion(): string {
@@ -27,10 +28,16 @@ async function bootstrap() {
   const corsOrigin = config.get('CORS_ORIGIN', { infer: true });
   const isProduction = config.get('NODE_ENV', { infer: true }) === 'production';
 
+  // ── WebSocket adapter ─────────────────────────────────────────────────────
+  app.useWebSocketAdapter(new WsAdapter(app));
+
   // ── Middleware ────────────────────────────────────────────────────────────
   app.use(cookieParser());
   app.enableCors({
-    origin: corsOrigin ?? '*',
+    // CORS_ORIGIN set → use it. Production without it → deny cross-origin
+    // (false). Non-production without it → reflect request origin (true) for
+    // developer convenience. Aligns with WsAdapter's CORS strategy.
+    origin: corsOrigin ?? (isProduction ? false : true),
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   });
