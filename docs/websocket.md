@@ -217,9 +217,10 @@ handleConfirm(
 }
 ```
 
-`@WsCurrentUser()` injects the user stored at connection time.
+`@WsCurrentUser()` injects the user stored by the auth middleware in `afterInit()`.
 `@UseGuards(WsJwtGuard)` is an extra safety net — in practice, unauthenticated
-sockets are already disconnected at `handleConnection`.
+handshakes are rejected before the socket reaches the connected state (client
+receives `connect_error`).
 
 ---
 

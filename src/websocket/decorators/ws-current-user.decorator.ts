@@ -6,8 +6,10 @@ import type { AuthUser } from '../../auth/strategies/jwt.strategy.js';
  * Extracts the authenticated user from a WebSocket execution context.
  * WebSocket equivalent of `@CurrentUser()`.
  *
- * Only available on handlers protected by `WsJwtGuard` (or after a successful
- * `handleConnection` which populates `client.data.user`).
+ * The user is populated by the Socket.IO auth middleware registered in
+ * `WebsocketGateway.afterInit()` — it is guaranteed to be set by the time
+ * any `@SubscribeMessage` handler runs, since unauthenticated handshakes are
+ * rejected before the socket reaches the connected state.
  *
  * ```ts
  * @UseGuards(WsJwtGuard)

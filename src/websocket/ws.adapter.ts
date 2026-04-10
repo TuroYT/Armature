@@ -16,23 +16,26 @@ import type { Env } from '../config/env.validation.js';
  */
 export class WsAdapter extends IoAdapter {
   private readonly corsOrigin: string | undefined;
+  private readonly isProduction: boolean;
 
   constructor(app: INestApplication) {
     super(app);
     const config = app.get<ConfigService<Env, true>>(ConfigService);
     this.corsOrigin = config.get('CORS_ORIGIN', { infer: true });
+    this.isProduction =
+      config.get('NODE_ENV', { infer: true }) === 'production';
   }
 
   override createIOServer(port: number, options?: ServerOptions): Server {
     return super.createIOServer(port, {
       ...options,
       cors: {
-        // When CORS_ORIGIN is not set, reflect the request origin (origin: true)
-        // instead of wildcard ('*'). Browsers reject credentialed requests with
-        // origin: '*', so this keeps credentials working in dev without an
-        // explicit origin while remaining safe (only the requesting origin is
-        // reflected, not all origins blindly accepted).
-        origin: this.corsOrigin ?? true,
+        // CORS_ORIGIN set → use it (all environments).
+        // Production without CORS_ORIGIN → deny cross-origin (false) to avoid
+        //   accidentally allowing credentialed requests from any origin.
+        // Non-production without CORS_ORIGIN → reflect request origin (true)
+        //   for developer convenience (works with credentials, no wildcard).
+        origin: this.corsOrigin ?? (this.isProduction ? false : true),
         credentials: true,
       },
     }) as Server;

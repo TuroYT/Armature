@@ -10,7 +10,7 @@ import {
   WsException,
   type WsResponse,
 } from '@nestjs/websockets';
-import { UseFilters, UseGuards } from '@nestjs/common';
+import { Logger, UseFilters, UseGuards } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Server, Socket } from 'socket.io';
 import { WsExceptionFilter } from './filters/ws-exception.filter.js';
@@ -83,6 +83,8 @@ export class WebsocketGateway
   @WebSocketServer()
   private readonly server: Server;
 
+  private readonly logger = new Logger(WebsocketGateway.name);
+
   constructor(
     private readonly jwtService: JwtService,
     private readonly policyRegistry: WsPolicyRegistry,
@@ -109,9 +111,15 @@ export class WebsocketGateway
     socket: Socket,
     next: (err?: Error) => void,
   ): Promise<void> {
+    // Authorization header may be string | string[] in Node.js — normalise first.
+    const rawAuth = socket.handshake.headers.authorization as
+      | string
+      | string[]
+      | undefined;
+    const authHeader = Array.isArray(rawAuth) ? rawAuth[0] : rawAuth;
     const token =
       (socket.handshake.auth as Record<string, string> | undefined)?.token ??
-      socket.handshake.headers.authorization?.split(' ')[1];
+      authHeader?.split(' ')[1];
 
     if (!token) {
       next(new Error(ErrorCode.UNAUTHORIZED));
@@ -170,8 +178,15 @@ export class WebsocketGateway
     await Promise.all(
       sockets.map(async (socket) => {
         const user = (socket.data as { user?: AuthUser }).user;
-        if (user && (await policy(user, data))) {
-          socket.emit(event, data);
+        if (!user) return;
+        try {
+          if (await policy(user, data)) socket.emit(event, data);
+        } catch (err) {
+          this.logger.warn('Policy evaluation failed', {
+            event,
+            socketId: socket.id,
+            error: err instanceof Error ? err.message : String(err),
+          });
         }
       }),
     );
@@ -197,8 +212,16 @@ export class WebsocketGateway
     await Promise.all(
       sockets.map(async (socket) => {
         const user = (socket.data as { user?: AuthUser }).user;
-        if (user && (await policy(user, data))) {
-          socket.emit(event, data);
+        if (!user) return;
+        try {
+          if (await policy(user, data)) socket.emit(event, data);
+        } catch (err) {
+          this.logger.warn('Policy evaluation failed', {
+            event,
+            room,
+            socketId: socket.id,
+            error: err instanceof Error ? err.message : String(err),
+          });
         }
       }),
     );
