@@ -27,9 +27,16 @@ export class WsAdapter extends IoAdapter {
   }
 
   override createIOServer(port: number, options?: ServerOptions): Server {
+    // Spread any gateway-level cors settings (e.g. methods, allowedHeaders)
+    // before overriding origin/credentials so they are not silently dropped.
+    const existingCors =
+      typeof options?.cors === 'object' && options.cors !== null
+        ? options.cors
+        : {};
     return super.createIOServer(port, {
       ...options,
       cors: {
+        ...existingCors,
         // CORS_ORIGIN set → use it (all environments).
         // Production without CORS_ORIGIN → deny cross-origin (false) to avoid
         //   accidentally allowing credentialed requests from any origin.

@@ -122,9 +122,16 @@ export class WebsocketGateway
       | string[]
       | undefined;
     const authHeader = Array.isArray(rawAuth) ? rawAuth[0] : rawAuth;
+    // Validate strict "Bearer <token>" format (case-insensitive, exactly two parts).
+    // Reject other schemes (Basic, Digest …) and malformed values (extra segments).
+    const parts = authHeader?.trim().split(/\s+/);
+    const headerToken =
+      parts?.length === 2 && parts[0].toLowerCase() === 'bearer'
+        ? parts[1]
+        : undefined;
     const token =
       (socket.handshake.auth as Record<string, string> | undefined)?.token ??
-      authHeader?.split(' ')[1];
+      headerToken;
 
     if (!token) {
       next(new Error(ErrorCode.UNAUTHORIZED));
