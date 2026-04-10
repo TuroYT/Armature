@@ -15,6 +15,7 @@ import { ResourceModule } from './resource/resource.module.js';
 import { GoogleAuthModule } from './auth/social/google-auth.module.js';
 import { QueueModule } from './queue/queue.module.js';
 import { PaymentModule } from './payment/payment.module.js';
+import { WebsocketModule } from './websocket/websocket.module.js';
 
 import { HttpExceptionFilter } from './common/filters/http-exception.filter.js';
 import { HttpLoggingInterceptor } from './common/logger/http-logging.interceptor.js';
@@ -41,6 +42,9 @@ import { JwtAuthGuard } from './auth/auth.guard.js';
 
     // ── Example resource (remove when using Armature as your base) ────────────
     ResourceModule,
+
+    // ── WebSocket (real-time events) ──────────────────────────────────────────
+    WebsocketModule,
 
     // ── Optional modules (self-activate, no code change needed) ──────────────
     GoogleAuthModule.register(), // needs: GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET

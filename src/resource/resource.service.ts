@@ -15,6 +15,7 @@ import type { CreateResourceDto } from './dto/create-resource.dto.js';
 import type { UpdateResourceDto } from './dto/update-resource.dto.js';
 import { ResourceResponseDto } from './dto/resource-response.dto.js';
 import type { PaginationQueryDto } from '../common/dto/pagination-query.dto.js';
+import { WebsocketGateway } from '../websocket/websocket.gateway.js';
 
 @Injectable()
 export class ResourceService {
@@ -22,6 +23,7 @@ export class ResourceService {
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly ws: WebsocketGateway,
     logger: LoggerService,
   ) {
     this.logger = logger.withContext('ResourceService');
@@ -35,7 +37,9 @@ export class ResourceService {
       data: { ...dto, ownerId },
     });
     this.logger.log('Resource created', { resourceId: resource.id, ownerId });
-    return serialize(ResourceResponseDto, resource);
+    const response = serialize(ResourceResponseDto, resource);
+    this.ws.emit('resource:created', response);
+    return response;
   }
 
   async findAll(
@@ -90,7 +94,9 @@ export class ResourceService {
       where: { id },
       data: dto,
     });
-    return serialize(ResourceResponseDto, updated);
+    const response = serialize(ResourceResponseDto, updated);
+    this.ws.emit('resource:updated', response);
+    return response;
   }
 
   async remove(id: string, userId: string, isAdmin: boolean): Promise<void> {
@@ -102,5 +108,6 @@ export class ResourceService {
 
     await this.prisma.resource.delete({ where: { id } });
     this.logger.log('Resource deleted', { resourceId: id });
+    this.ws.emit('resource:deleted', { id });
   }
 }
