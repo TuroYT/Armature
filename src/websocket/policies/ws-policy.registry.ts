@@ -60,7 +60,10 @@ export type WsRoomPolicyFn = (user: AuthUser) => boolean | Promise<boolean>;
  *
  * ## Behaviour
  * - If **no policy** is registered for an event, the event is broadcast to
- *   **all** connected clients (open by default — safe for public data).
+ *   **all authenticated clients** (every socket that passed the handshake
+ *   middleware). Because all sockets are authenticated, this is safe for
+ *   non-sensitive data but you **must** register a policy for any event that
+ *   carries user-specific or sensitive payloads.
  * - If a policy is registered, the payload is evaluated per-client and only
  *   delivered to those for whom the policy returns `true`.
  * - If **no room policy** is registered, any authenticated client may join.

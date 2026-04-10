@@ -13,6 +13,7 @@ import {
 import { Logger, UseFilters, UseGuards } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Server, Socket } from 'socket.io';
+import { TokenExpiredError } from 'jsonwebtoken';
 import { WsExceptionFilter } from './filters/ws-exception.filter.js';
 import { WsJwtGuard } from './guards/ws-jwt.guard.js';
 import { WsCurrentUser } from './decorators/ws-current-user.decorator.js';
@@ -138,8 +139,16 @@ export class WebsocketGateway
         roles: payload.roles,
       };
       next();
-    } catch {
-      next(new Error(ErrorCode.INVALID_TOKEN));
+    } catch (err) {
+      // Map TokenExpiredError to TOKEN_EXPIRED so clients can distinguish an
+      // expired token (refreshable) from a malformed/invalid one.
+      next(
+        new Error(
+          err instanceof TokenExpiredError
+            ? ErrorCode.TOKEN_EXPIRED
+            : ErrorCode.INVALID_TOKEN,
+        ),
+      );
     }
   }
 
@@ -162,6 +171,12 @@ export class WebsocketGateway
    * If a policy is registered for `event` (via `WsPolicyRegistry`), the
    * payload is evaluated per-client and only delivered to those that pass.
    * With no policy the event is broadcast to everyone.
+   *
+   * **Performance note:** when a policy is registered, this calls
+   * `server.fetchSockets()` and iterates every connected socket. For
+   * high-frequency events or large connection pools, prefer
+   * `emitToRoom()` with scoped rooms (e.g. per-user or per-tenant) to
+   * avoid the O(n) fan-out.
    *
    * ```ts
    * this.ws.emit('resource:created', dto);

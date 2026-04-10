@@ -30,9 +30,13 @@ export class WsExceptionFilter extends BaseWsExceptionFilter {
   override catch(exception: unknown, host: ArgumentsHost): void {
     const client = host.switchToWs().getClient<Socket>();
 
-    const locale = this.i18n.resolveLocale(
-      client.handshake.headers['accept-language'],
-    );
+    // accept-language can be string | string[] in Node.js — normalise to string.
+    const rawLang = client.handshake.headers['accept-language'] as
+      | string
+      | string[]
+      | undefined;
+    const acceptLanguage = Array.isArray(rawLang) ? rawLang[0] : rawLang;
+    const locale = this.i18n.resolveLocale(acceptLanguage);
 
     if (exception instanceof WsException) {
       const error = exception.getError();
