@@ -1,8 +1,9 @@
-import { ArgumentsHost, Catch, Injectable, Logger } from '@nestjs/common';
+import { ArgumentsHost, Catch, Injectable } from '@nestjs/common';
 import { BaseWsExceptionFilter, WsException } from '@nestjs/websockets';
 import { Socket } from 'socket.io';
 import { ErrorCode } from '../../common/constants/error-constants.js';
 import { I18nService } from '../../common/services/i18n.service.js';
+import { LoggerService } from '../../common/logger/logger.service.js';
 
 /**
  * WebSocket exception filter.
@@ -21,10 +22,14 @@ import { I18nService } from '../../common/services/i18n.service.js';
 @Injectable()
 @Catch()
 export class WsExceptionFilter extends BaseWsExceptionFilter {
-  private readonly logger = new Logger(WsExceptionFilter.name);
+  private readonly logger: LoggerService;
 
-  constructor(private readonly i18n: I18nService) {
+  constructor(
+    private readonly i18n: I18nService,
+    logger: LoggerService,
+  ) {
     super();
+    this.logger = logger.withContext('WsExceptionFilter');
   }
 
   override catch(exception: unknown, host: ArgumentsHost): void {

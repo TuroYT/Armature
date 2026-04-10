@@ -10,7 +10,8 @@ import {
   WsException,
   type WsResponse,
 } from '@nestjs/websockets';
-import { Logger, UseFilters, UseGuards } from '@nestjs/common';
+import { UseFilters, UseGuards } from '@nestjs/common';
+import { LoggerService } from '../common/logger/logger.service.js';
 import { JwtService } from '@nestjs/jwt';
 import { Server, Socket } from 'socket.io';
 import { TokenExpiredError } from 'jsonwebtoken';
@@ -84,12 +85,15 @@ export class WebsocketGateway
   @WebSocketServer()
   private readonly server: Server;
 
-  private readonly logger = new Logger(WebsocketGateway.name);
+  private readonly logger: LoggerService;
 
   constructor(
     private readonly jwtService: JwtService,
     private readonly policyRegistry: WsPolicyRegistry,
-  ) {}
+    logger: LoggerService,
+  ) {
+    this.logger = logger.withContext('WebsocketGateway');
+  }
 
   // ── Initialisation ──────────────────────────────────────────────────────────
 

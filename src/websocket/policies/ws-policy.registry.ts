@@ -1,5 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import type { AuthUser } from '../../auth/strategies/jwt.strategy.js';
+import { LoggerService } from '../../common/logger/logger.service.js';
 
 /**
  * A policy function that decides whether a given user is allowed to receive
@@ -70,9 +71,13 @@ export type WsRoomPolicyFn = (user: AuthUser) => boolean | Promise<boolean>;
  */
 @Injectable()
 export class WsPolicyRegistry {
-  private readonly logger = new Logger(WsPolicyRegistry.name);
+  private readonly logger: LoggerService;
   private readonly eventPolicies = new Map<string, WsPolicyFn>();
   private readonly roomPolicies = new Map<string, WsRoomPolicyFn>();
+
+  constructor(logger: LoggerService) {
+    this.logger = logger.withContext('WsPolicyRegistry');
+  }
 
   /**
    * Register an event-level policy.
