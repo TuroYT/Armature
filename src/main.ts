@@ -6,6 +6,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
 import { readFileSync } from 'fs';
 import { AppModule } from './app.module.js';
+import { WsAdapter } from './websocket/ws.adapter.js';
 import type { Env } from './config/env.validation.js';
 
 function getPackageVersion(): string {
@@ -26,6 +27,9 @@ async function bootstrap() {
   const port = config.get('PORT', { infer: true });
   const corsOrigin = config.get('CORS_ORIGIN', { infer: true });
   const isProduction = config.get('NODE_ENV', { infer: true }) === 'production';
+
+  // ── WebSocket adapter ─────────────────────────────────────────────────────
+  app.useWebSocketAdapter(new WsAdapter(app));
 
   // ── Middleware ────────────────────────────────────────────────────────────
   app.use(cookieParser());

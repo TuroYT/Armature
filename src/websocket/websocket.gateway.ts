@@ -70,12 +70,8 @@ import type { AuthUser, JwtPayload } from '../auth/strategies/jwt.strategy.js';
  * );
  * ```
  */
-@WebSocketGateway({
-  cors: {
-    origin: process.env['CORS_ORIGIN'] ?? '*',
-    credentials: true,
-  },
-})
+// CORS is configured via WsAdapter in main.ts, which reads from ConfigService.
+@WebSocketGateway()
 @UseFilters(WsExceptionFilter)
 export class WebsocketGateway
   implements OnGatewayConnection, OnGatewayDisconnect
@@ -102,6 +98,10 @@ export class WebsocketGateway
 
     try {
       const payload = await this.jwtService.verifyAsync<JwtPayload>(token);
+      if (!payload.sub) {
+        client.disconnect();
+        return;
+      }
       client.data.user = {
         id: payload.sub,
         email: payload.email,

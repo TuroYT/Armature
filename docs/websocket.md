@@ -161,7 +161,9 @@ offending client:
 { "code": "UNAUTHORIZED", "message": "Authentication required" }
 ```
 
-`code` is always an `ErrorCode` constant.
+`code` is always an `ErrorCode` constant. `message` is translated via
+`I18nService` using the `Accept-Language` header from the Socket.IO handshake
+(same behaviour as the HTTP exception filter). Default locale is `en`.
 
 ---
 
