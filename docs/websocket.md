@@ -19,7 +19,7 @@ socket.on('connect', () => console.log('connected'));
 socket.on('disconnect', (reason) => console.log('disconnected', reason));
 socket.on('error', (err) => console.error('ws error', err));
 
-// Listen for resource events
+// Listen for resource events (only received if the policy allows it)
 socket.on('resource:created', (data) => console.log('created', data));
 socket.on('resource:updated', (data) => console.log('updated', data));
 socket.on('resource:deleted', ({ id }) => console.log('deleted', id));
@@ -54,21 +54,107 @@ apply to WebSocket connections.
 
 ---
 
+## Policies (row-level security)
+
+WebSocket policies control which clients receive which events — analogous to
+Supabase Row-Level Security but applied at the emission layer.
+
+### How it works
+
+When `WebsocketGateway.emit(event, data)` is called:
+
+1. The registry is checked for a policy registered against `event`.
+2. **No policy** → event is broadcast to **all** connected clients (open by default).
+3. **Policy found** → the payload is evaluated for each connected socket; only
+   clients for whom `policy(user, payload) === true` receive the event.
+
+The same logic applies to `emitToRoom()`.
+
+### Registering policies
+
+Create an `OnModuleInit` provider in your feature module:
+
+```ts
+// src/order/order.ws-policy.ts
+import { Injectable, OnModuleInit } from '@nestjs/common';
+import { WsPolicyRegistry } from '../websocket/policies/ws-policy.registry.js';
+import type { OrderResponseDto } from './dto/order-response.dto.js';
+
+@Injectable()
+export class OrderWsPolicy implements OnModuleInit {
+  constructor(private readonly registry: WsPolicyRegistry) {}
+
+  onModuleInit(): void {
+    // Only the order owner or an admin receives this event
+    this.registry.register<OrderResponseDto>(
+      'order:created',
+      (user, order) => user.id === order.ownerId || user.roles.includes('admin'),
+    );
+
+    // All authenticated users receive order updates (no restriction)
+    this.registry.register<OrderResponseDto>(
+      'order:updated',
+      () => true,
+    );
+
+    // Only admins can subscribe to the shared 'orders' room
+    this.registry.registerRoomPolicy(
+      'orders',
+      (user) => user.roles.includes('admin'),
+    );
+  }
+}
+```
+
+Register it in your module:
+
+```ts
+// src/order/order.module.ts
+@Module({
+  imports: [WebsocketModule],
+  providers: [OrderService, OrderWsPolicy],
+  controllers: [OrderController],
+})
+export class OrderModule {}
+```
+
+### Policy function signature
+
+```ts
+// Event policy
+type WsPolicyFn<T> = (user: AuthUser, payload: T) => boolean | Promise<boolean>;
+
+// Room policy
+type WsRoomPolicyFn = (user: AuthUser) => boolean | Promise<boolean>;
+```
+
+`AuthUser` is `{ id: string; email: string; roles: string[] }` — the same shape
+as the REST API's `@CurrentUser()`.
+
+### Built-in resource policies (`src/resource/resource.ws-policy.ts`)
+
+| Event               | Rule                                                    |
+|---------------------|---------------------------------------------------------|
+| `resource:created`  | Admin **or** resource owner (`ownerId === user.id`)     |
+| `resource:updated`  | Admin **or** resource owner                             |
+| `resource:deleted`  | Admin only (payload has no `ownerId`)                   |
+| Room `resources`    | Admin only                                              |
+
+---
+
 ## Server → Client events
 
 ### Built-in resource events
 
-| Event               | Payload                   | Triggered by             |
-|---------------------|---------------------------|--------------------------|
-| `resource:created`  | `ResourceResponseDto`     | `POST /api/resources`    |
+| Event               | Payload                   | Triggered by               |
+|---------------------|---------------------------|----------------------------|
+| `resource:created`  | `ResourceResponseDto`     | `POST /api/resources`      |
 | `resource:updated`  | `ResourceResponseDto`     | `PATCH /api/resources/:id` |
-| `resource:deleted`  | `{ id: string }`          | `DELETE /api/resources/:id` |
-
-All connected authenticated clients receive these broadcasts.
+| `resource:deleted`  | `{ id: string }`          | `DELETE /api/resources/:id`|
 
 ### Error event
 
-When a WebSocket exception occurs the gateway emits an `error` event to the
+When a WebSocket exception occurs, the gateway emits an `error` event to the
 offending client:
 
 ```json
@@ -93,6 +179,7 @@ socket.on('pong', ({ userId, timestamp }) => console.log('alive', timestamp));
 ### `subscribe`
 
 Join a named room to receive scoped broadcasts (see [Rooms](#rooms)).
+If a room policy is registered, the user must pass it or receive a `FORBIDDEN` error.
 
 ```ts
 socket.emit('subscribe', { room: 'resources' });
@@ -106,77 +193,7 @@ Leave a named room.
 socket.emit('unsubscribe', { room: 'resources' });
 ```
 
----
-
-## Rooms
-
-Rooms allow you to broadcast to a subset of clients instead of everyone.
-
-**Client side** — join a room first:
-
-```ts
-socket.emit('subscribe', { room: 'resources' });
-```
-
-**Server side** — emit to the room:
-
-```ts
-this.ws.emitToRoom('resources', 'resource:created', payload);
-```
-
-A client that never calls `subscribe` won't receive room-scoped events, but
-will still receive global broadcasts (`this.ws.emit(...)`).
-
----
-
-## Adding real-time events to a new module
-
-Follow these three steps — no changes to `WebsocketModule` are needed.
-
-### 1. Import `WebsocketModule` in your feature module
-
-```ts
-// src/order/order.module.ts
-import { WebsocketModule } from '../websocket/websocket.module.js';
-
-@Module({
-  imports: [WebsocketModule],
-  providers: [OrderService],
-  controllers: [OrderController],
-})
-export class OrderModule {}
-```
-
-### 2. Inject `WebsocketGateway` in your service
-
-```ts
-// src/order/order.service.ts
-import { WebsocketGateway } from '../websocket/websocket.gateway.js';
-
-@Injectable()
-export class OrderService {
-  constructor(private readonly ws: WebsocketGateway) {}
-
-  async create(dto: CreateOrderDto): Promise<OrderResponseDto> {
-    const order = await this.prisma.order.create({ data: dto });
-    const response = serialize(OrderResponseDto, order);
-    this.ws.emit('order:created', response);   // broadcast to all
-    return response;
-  }
-}
-```
-
-### 3. Listen on the client
-
-```ts
-socket.on('order:created', (data) => console.log('new order', data));
-```
-
-That's it.
-
----
-
-## Adding custom client → server handlers
+### Adding custom handlers
 
 Add a `@SubscribeMessage` method to `WebsocketGateway` (or create a separate
 gateway in your own module):
@@ -193,9 +210,73 @@ handleConfirm(
 }
 ```
 
-The `@WsCurrentUser()` decorator injects the user attached during
-`handleConnection`. `@UseGuards(WsJwtGuard)` is an extra safety net — in
-practice unauthenticated sockets are already disconnected at connection time.
+`@WsCurrentUser()` injects the user stored at connection time.
+`@UseGuards(WsJwtGuard)` is an extra safety net — in practice, unauthenticated
+sockets are already disconnected at `handleConnection`.
+
+---
+
+## Rooms
+
+Rooms let you broadcast to a subset of clients instead of everyone.
+
+**Client side** — join a room first:
+
+```ts
+socket.emit('subscribe', { room: 'resources' });
+```
+
+**Server side** — emit to the room (policy applies):
+
+```ts
+await this.ws.emitToRoom('resources', 'resource:updated', payload);
+```
+
+A client that never joins a room won't receive room-scoped events, but will
+still receive global broadcasts (`this.ws.emit(...)`).
+
+---
+
+## Adding real-time events to a new module
+
+### 1. Import `WebsocketModule`
+
+```ts
+// src/order/order.module.ts
+@Module({
+  imports: [WebsocketModule],
+  providers: [OrderService, OrderWsPolicy],
+  controllers: [OrderController],
+})
+export class OrderModule {}
+```
+
+### 2. Inject `WebsocketGateway` and emit events
+
+```ts
+// src/order/order.service.ts
+@Injectable()
+export class OrderService {
+  constructor(private readonly ws: WebsocketGateway) {}
+
+  async create(dto: CreateOrderDto): Promise<OrderResponseDto> {
+    const order = await this.prisma.order.create({ data: dto });
+    const response = serialize(OrderResponseDto, order);
+    await this.ws.emit('order:created', response); // filtered by policy
+    return response;
+  }
+}
+```
+
+### 3. Define policies (optional)
+
+See [Registering policies](#registering-policies) above.
+
+### 4. Listen on the client
+
+```ts
+socket.on('order:created', (data) => console.log('new order', data));
+```
 
 ---
 
@@ -203,16 +284,20 @@ practice unauthenticated sockets are already disconnected at connection time.
 
 ```
 src/websocket/
-├── websocket.module.ts          Module — imports JwtModule, exports Gateway + Guard + Filter
-├── websocket.gateway.ts         Socket.IO gateway — auth, emit helpers, built-in handlers
+├── websocket.module.ts               Module — provides & exports Gateway, Registry, Guard, Filter
+├── websocket.gateway.ts              Socket.IO gateway — auth, policy-aware emit, built-in handlers
+├── policies/
+│   └── ws-policy.registry.ts         Injectable registry — register event & room policies
 ├── guards/
-│   └── ws-jwt.guard.ts          Per-event guard (checks client.data.user)
+│   └── ws-jwt.guard.ts               Per-event guard (checks client.data.user)
 ├── filters/
-│   └── ws-exception.filter.ts  Catches WsException + unknown errors → emits `error` event
+│   └── ws-exception.filter.ts        Catches WsException + unknown errors → emits `error` event
 └── decorators/
-    └── ws-current-user.decorator.ts   @WsCurrentUser() param decorator
+    └── ws-current-user.decorator.ts  @WsCurrentUser() param decorator
+
+src/resource/
+└── resource.ws-policy.ts             Example domain policy (owner / admin rules)
 ```
 
 The gateway reuses the same HTTP port — no extra port or infrastructure needed.
-CORS is configured via the `CORS_ORIGIN` environment variable (same as the REST
-API).
+CORS is configured via the `CORS_ORIGIN` environment variable (same as the REST API).

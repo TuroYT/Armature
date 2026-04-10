@@ -15,6 +15,7 @@ import { Server, Socket } from 'socket.io';
 import { WsExceptionFilter } from './filters/ws-exception.filter.js';
 import { WsJwtGuard } from './guards/ws-jwt.guard.js';
 import { WsCurrentUser } from './decorators/ws-current-user.decorator.js';
+import { WsPolicyRegistry } from './policies/ws-policy.registry.js';
 import { ErrorCode } from '../common/constants/error-constants.js';
 import type { AuthUser, JwtPayload } from '../auth/strategies/jwt.strategy.js';
 
@@ -22,44 +23,52 @@ import type { AuthUser, JwtPayload } from '../auth/strategies/jwt.strategy.js';
  * Central WebSocket gateway.
  *
  * ## Authentication
- * Every connection must supply a valid JWT access token. Pass it in the
- * Socket.IO handshake `auth` object (recommended) or as a Bearer token in the
- * `Authorization` header:
+ * Every connection must supply a valid JWT access token in the Socket.IO
+ * handshake `auth` object (recommended) or as a `Bearer` header:
  *
  * ```ts
- * // Client-side
  * const socket = io('http://localhost:3000', {
  *   auth: { token: '<access-token>' },
  * });
  * ```
  *
- * Invalid / missing tokens are rejected immediately and the socket is
- * disconnected.
+ * Connections with a missing or invalid token are disconnected immediately.
  *
  * ## Server → Client events
- * The gateway exposes an `emit()` helper so any service can broadcast domain
- * events without depending on Socket.IO internals:
+ * Use the `emit()` / `emitToRoom()` helpers from any injected service.
+ * If a policy is registered for the event (via `WsPolicyRegistry`), the
+ * payload is evaluated per-client — only clients that pass the policy receive
+ * the event.
  *
  * ```ts
- * // In any service that injects WebsocketGateway:
- * this.ws.emit('resource:created', payload);
+ * this.ws.emit('resource:created', dto);          // respects policies
+ * this.ws.emitToRoom('admin', 'stats:updated', dto); // respects policies
  * ```
  *
  * ## Client → Server events
- * Clients can send events after connecting. Built-in handlers:
  *
- * | Event       | Payload     | Response event | Description               |
- * |-------------|-------------|----------------|---------------------------|
- * | `ping`      | —           | `pong`         | Liveness check            |
- * | `subscribe` | `{ room }`  | —              | Join a named room         |
- * | `unsubscribe` | `{ room }` | —             | Leave a named room        |
+ * | Event         | Payload       | Response       | Description             |
+ * |---------------|---------------|----------------|-------------------------|
+ * | `ping`        | —             | `pong`         | Liveness check          |
+ * | `subscribe`   | `{ room }`    | —              | Join a room             |
+ * | `unsubscribe` | `{ room }`    | —              | Leave a room            |
  *
- * Add your own handlers with `@SubscribeMessage('event-name')`.
+ * Add custom handlers with `@SubscribeMessage('event-name')`.
  *
- * ## Rooms
- * Clients may join rooms to receive scoped broadcasts. Use
- * `emitToRoom(room, event, data)` from any service to target a room instead of
- * broadcasting to everyone.
+ * ## Policies
+ * Register rules via `WsPolicyRegistry` in any `OnModuleInit` provider:
+ *
+ * ```ts
+ * // Event policy — filter who receives the payload
+ * registry.register<ResourceDto>('resource:created', (user, res) =>
+ *   user.roles.includes('admin') || res.ownerId === user.id,
+ * );
+ *
+ * // Room policy — control who can subscribe
+ * registry.registerRoomPolicy('admin', (user) =>
+ *   user.roles.includes('admin'),
+ * );
+ * ```
  */
 @WebSocketGateway({
   cors: {
@@ -74,7 +83,10 @@ export class WebsocketGateway
   @WebSocketServer()
   private readonly server: Server;
 
-  constructor(private readonly jwtService: JwtService) {}
+  constructor(
+    private readonly jwtService: JwtService,
+    private readonly policyRegistry: WsPolicyRegistry,
+  ) {}
 
   // ── Connection lifecycle ────────────────────────────────────────────────────
 
@@ -107,25 +119,59 @@ export class WebsocketGateway
   // ── Server → Client helpers ─────────────────────────────────────────────────
 
   /**
-   * Broadcast an event to **all** connected, authenticated clients.
+   * Broadcast an event to all connected clients.
+   *
+   * If a policy is registered for `event` (via `WsPolicyRegistry`), the
+   * payload is evaluated per-client and only delivered to those that pass.
+   * With no policy the event is broadcast to everyone.
    *
    * ```ts
    * this.ws.emit('resource:created', dto);
    * ```
    */
-  emit<T>(event: string, data: T): void {
-    this.server.emit(event, data);
+  async emit<T>(event: string, data: T): Promise<void> {
+    const policy = this.policyRegistry.getEventPolicy(event);
+    if (!policy) {
+      this.server.emit(event, data);
+      return;
+    }
+
+    const sockets = await this.server.fetchSockets();
+    await Promise.all(
+      sockets.map(async (socket) => {
+        const user = socket.data.user as AuthUser | undefined;
+        if (user && (await policy(user, data))) {
+          socket.emit(event, data);
+        }
+      }),
+    );
   }
 
   /**
-   * Broadcast an event to every client in a specific room.
+   * Broadcast an event to every client in a room.
+   *
+   * Policies apply the same way as `emit()`.
    *
    * ```ts
-   * this.ws.emitToRoom('resources', 'resource:updated', dto);
+   * this.ws.emitToRoom('admin', 'stats:updated', dto);
    * ```
    */
-  emitToRoom<T>(room: string, event: string, data: T): void {
-    this.server.to(room).emit(event, data);
+  async emitToRoom<T>(room: string, event: string, data: T): Promise<void> {
+    const policy = this.policyRegistry.getEventPolicy(event);
+    if (!policy) {
+      this.server.to(room).emit(event, data);
+      return;
+    }
+
+    const sockets = await this.server.in(room).fetchSockets();
+    await Promise.all(
+      sockets.map(async (socket) => {
+        const user = socket.data.user as AuthUser | undefined;
+        if (user && (await policy(user, data))) {
+          socket.emit(event, data);
+        }
+      }),
+    );
   }
 
   // ── Client → Server handlers ────────────────────────────────────────────────
@@ -143,36 +189,44 @@ export class WebsocketGateway
   }
 
   /**
-   * Join a named room to receive scoped broadcasts.
+   * Join a named room to receive room-scoped broadcasts.
+   * If a room policy is registered, it is enforced before the client joins.
    *
    * ```ts
-   * socket.emit('subscribe', { room: 'resources' });
+   * socket.emit('subscribe', { room: 'admin' });
    * ```
    */
   @UseGuards(WsJwtGuard)
   @SubscribeMessage('subscribe')
-  handleSubscribe(
+  async handleSubscribe(
     @MessageBody() body: { room: string },
     @ConnectedSocket() client: Socket,
-  ): void {
+    @WsCurrentUser() user: AuthUser,
+  ): Promise<void> {
     if (!body?.room) throw new WsException(ErrorCode.BAD_REQUEST);
-    void client.join(body.room);
+
+    const roomPolicy = this.policyRegistry.getRoomPolicy(body.room);
+    if (roomPolicy && !(await roomPolicy(user))) {
+      throw new WsException(ErrorCode.FORBIDDEN);
+    }
+
+    await client.join(body.room);
   }
 
   /**
    * Leave a named room.
    *
    * ```ts
-   * socket.emit('unsubscribe', { room: 'resources' });
+   * socket.emit('unsubscribe', { room: 'admin' });
    * ```
    */
   @UseGuards(WsJwtGuard)
   @SubscribeMessage('unsubscribe')
-  handleUnsubscribe(
+  async handleUnsubscribe(
     @MessageBody() body: { room: string },
     @ConnectedSocket() client: Socket,
-  ): void {
+  ): Promise<void> {
     if (!body?.room) throw new WsException(ErrorCode.BAD_REQUEST);
-    void client.leave(body.room);
+    await client.leave(body.room);
   }
 }
