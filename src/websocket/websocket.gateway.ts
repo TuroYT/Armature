@@ -3,6 +3,7 @@ import {
   MessageBody,
   OnGatewayConnection,
   OnGatewayDisconnect,
+  OnGatewayInit,
   SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
@@ -32,7 +33,10 @@ import type { AuthUser, JwtPayload } from '../auth/strategies/jwt.strategy.js';
  * });
  * ```
  *
- * Connections with a missing or invalid token are disconnected immediately.
+ * Authentication runs in a Socket.IO middleware (`server.use()`), which means
+ * the handshake is rejected **before** the connection is established. This
+ * guarantees that `client.data.user` is always set when any event handler runs,
+ * and that unauthenticated sockets cannot receive unguarded broadcasts.
  *
  * ## Server → Client events
  * Use the `emit()` / `emitToRoom()` helpers from any injected service.
@@ -74,7 +78,7 @@ import type { AuthUser, JwtPayload } from '../auth/strategies/jwt.strategy.js';
 @WebSocketGateway()
 @UseFilters(WsExceptionFilter)
 export class WebsocketGateway
-  implements OnGatewayConnection, OnGatewayDisconnect
+  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
 {
   @WebSocketServer()
   private readonly server: Server;
@@ -84,32 +88,58 @@ export class WebsocketGateway
     private readonly policyRegistry: WsPolicyRegistry,
   ) {}
 
-  // ── Connection lifecycle ────────────────────────────────────────────────────
+  // ── Initialisation ──────────────────────────────────────────────────────────
 
-  async handleConnection(client: Socket): Promise<void> {
+  /**
+   * Register a Socket.IO middleware that authenticates every connection at
+   * the handshake stage — **before** `handleConnection` fires and before the
+   * socket can receive any broadcast.
+   *
+   * Rejecting here (via `next(new Error(...))`) causes Socket.IO to refuse the
+   * upgrade entirely, so unauthenticated sockets never enter the connected
+   * state and cannot receive events without a policy.
+   */
+  afterInit(server: Server): void {
+    server.use((socket, next) => {
+      void this.authenticateSocket(socket, next);
+    });
+  }
+
+  private async authenticateSocket(
+    socket: Socket,
+    next: (err?: Error) => void,
+  ): Promise<void> {
     const token =
-      (client.handshake.auth as Record<string, string> | undefined)?.token ??
-      client.handshake.headers.authorization?.split(' ')[1];
+      (socket.handshake.auth as Record<string, string> | undefined)?.token ??
+      socket.handshake.headers.authorization?.split(' ')[1];
 
     if (!token) {
-      client.disconnect();
+      next(new Error(ErrorCode.UNAUTHORIZED));
       return;
     }
 
     try {
       const payload = await this.jwtService.verifyAsync<JwtPayload>(token);
       if (!payload.sub) {
-        client.disconnect();
+        next(new Error(ErrorCode.UNAUTHORIZED));
         return;
       }
-      (client.data as { user: AuthUser }).user = {
+      (socket.data as { user: AuthUser }).user = {
         id: payload.sub,
         email: payload.email,
         roles: payload.roles,
       };
+      next();
     } catch {
-      client.disconnect();
+      next(new Error(ErrorCode.INVALID_TOKEN));
     }
+  }
+
+  // ── Connection lifecycle ────────────────────────────────────────────────────
+
+  handleConnection(): void {
+    // User is already authenticated by the middleware in afterInit().
+    // Override to add post-connect logic (e.g. presence tracking, room auto-join).
   }
 
   handleDisconnect(): void {

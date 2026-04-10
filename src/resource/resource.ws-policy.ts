@@ -14,7 +14,7 @@ import type { ResourceResponseDto } from './dto/resource-response.dto.js';
  * |---------------------|----------------------------------------------------|
  * | `resource:created`  | Admin **or** the resource owner                   |
  * | `resource:updated`  | Admin **or** the resource owner                   |
- * | `resource:deleted`  | Admin **or** the resource owner (by stored id)    |
+ * | `resource:deleted`  | Admin only (payload has no `ownerId` to check)    |
  * | Room `resources`    | Admin only                                         |
  *
  * ## Customising

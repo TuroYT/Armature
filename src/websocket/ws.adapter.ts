@@ -27,7 +27,12 @@ export class WsAdapter extends IoAdapter {
     return super.createIOServer(port, {
       ...options,
       cors: {
-        origin: this.corsOrigin ?? '*',
+        // When CORS_ORIGIN is not set, reflect the request origin (origin: true)
+        // instead of wildcard ('*'). Browsers reject credentialed requests with
+        // origin: '*', so this keeps credentials working in dev without an
+        // explicit origin while remaining safe (only the requesting origin is
+        // reflected, not all origins blindly accepted).
+        origin: this.corsOrigin ?? true,
         credentials: true,
       },
     }) as Server;

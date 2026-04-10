@@ -41,7 +41,8 @@ export class ResourceService {
     void this.ws.emit('resource:created', response).catch((err: unknown) =>
       this.logger.warn('WebSocket emit failed', {
         event: 'resource:created',
-        error: err,
+        error: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined,
       }),
     );
     return response;
@@ -103,7 +104,8 @@ export class ResourceService {
     void this.ws.emit('resource:updated', response).catch((err: unknown) =>
       this.logger.warn('WebSocket emit failed', {
         event: 'resource:updated',
-        error: err,
+        error: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined,
       }),
     );
     return response;
@@ -121,7 +123,8 @@ export class ResourceService {
     void this.ws.emit('resource:deleted', { id }).catch((err: unknown) =>
       this.logger.warn('WebSocket emit failed', {
         event: 'resource:deleted',
-        error: err,
+        error: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined,
       }),
     );
   }
