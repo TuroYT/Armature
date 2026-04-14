@@ -55,5 +55,8 @@ pids
 # MCP session (contains JWT tokens — never commit)
 .claude/.armature-session.json
 
+# MCP sub-directory dependencies
+mcp/node_modules/
+
 # Dev
 .vscode
