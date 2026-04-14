@@ -27,35 +27,42 @@ Armature uses **stateless JWT** authentication with secure refresh token rotatio
 
 ## Token flow
 
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as Client
+    participant S as Server
+    participant DB as Database
+
+    C->>S: POST /api/auth/login
+    S->>S: Validate credentials
+    S->>DB: Store bcrypt(refreshToken)
+    S-->>C: { accessToken, refreshToken }
+
+    C->>S: GET /api/resource — Authorization: Bearer &lt;accessToken&gt;
+    S->>S: Validate JWT signature + expiry
+    S-->>C: 200 OK
+
+    Note over C,S: Access token expires
+
+    C->>S: POST /api/auth/refresh — Authorization: Bearer &lt;refreshToken&gt;
+    S->>DB: Find matching bcrypt hash
+    S->>DB: Delete old token (prevents reuse)
+    S->>S: Issue new token pair
+    S-->>C: { accessToken, refreshToken }
 ```
-Client                           Server
-  │                                │
-  │  POST /api/auth/login          │
-  │ ─────────────────────────────► │  validates credentials
-  │                                │  generates accessToken + refreshToken
-  │                                │  stores bcrypt(refreshToken) in DB
-  │ ◄───────────────────────────── │
-  │  { accessToken, refreshToken } │
-  │                                │
-  │  GET /api/resource             │
-  │  Authorization: Bearer <at>    │
-  │ ─────────────────────────────► │  validates JWT signature + expiry
-  │ ◄───────────────────────────── │
-  │                                │
-  │  POST /api/auth/refresh        │  access token expired
-  │  Authorization: Bearer <rt>    │
-  │ ─────────────────────────────► │  finds matching bcrypt hash in DB
-  │                                │  deletes old token (prevents reuse)
-  │                                │  issues new token pair
-  │ ◄───────────────────────────── │
-  │  { accessToken, refreshToken } │
-```
+
+!!! info "Single-use refresh tokens"
+    Each call to `/api/auth/refresh` **invalidates** the old refresh token and issues a brand-new pair. Replaying a used refresh token returns `401 INVALID_REFRESH_TOKEN`.
 
 ## Guards and decorators
 
 ### JwtAuthGuard (global)
 
 Applied globally in `AppModule`. Every route requires a valid access token unless explicitly opted out.
+
+!!! tip "Opting out"
+    Use `@Public()` on any route that should be accessible without a token (e.g. login, register, public webhooks).
 
 ```ts
 // Skip auth on a route
@@ -105,7 +112,8 @@ async handleCallback(profile: SocialProfile): Promise<User> {
 }
 ```
 
-Users created via OAuth have `passwordHash = null`. They cannot log in with email + password unless a password is set separately.
+!!! warning "OAuth-only accounts"
+    Users created via OAuth have `passwordHash = null`. They cannot log in with email + password unless a password is set separately.
 
 ## Auth methods endpoint
 

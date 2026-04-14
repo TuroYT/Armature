@@ -2,6 +2,9 @@
 
 All optional modules use a `static register()` pattern that reads environment variables at startup. When the required variables are absent, the module returns an empty `DynamicModule` — no controllers, no providers, no Swagger routes.
 
+!!! tip "Zero-config activation"
+    Set the required env vars and restart the server — no code changes needed. Swagger routes and `GET /api/auth/methods` update automatically.
+
 ## Redis / BullMQ
 
 **Activates when:** `REDIS_URL` is set.
@@ -86,7 +89,7 @@ const { clientSecret } = await this.paymentService.createIntent(
 The webhook endpoint verifies the Stripe signature using `STRIPE_WEBHOOK_SECRET`. Extend `PaymentService.handleWebhook()` to handle the events relevant to your domain.
 
 !!! note
-The raw request body must be preserved for Stripe signature verification. Armature configures `rawBody: true` in `NestFactory.create()` for this purpose.
+    The raw request body must be preserved for Stripe signature verification. Armature configures `rawBody: true` in `NestFactory.create()` for this purpose.
 
 ---
 

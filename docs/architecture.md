@@ -76,6 +76,24 @@ src/
     └── dto/
 ```
 
+## Request lifecycle
+
+```mermaid
+flowchart LR
+    A[HTTP Request] --> B[JwtAuthGuard]
+    B -->|valid token| C[RolesGuard / PermissionsGuard]
+    B -->|invalid / missing| X1["401 Unauthorized\n(HttpExceptionFilter)"]
+    C -->|allowed| D[Controller]
+    C -->|denied| X2["403 Forbidden\n(HttpExceptionFilter)"]
+    D --> E[Service]
+    E --> F[PrismaService]
+    F --> G[(PostgreSQL)]
+    E -->|optional| H[CacheService]
+    H --> I[(Redis)]
+    D --> J["serialize(Dto, data)"]
+    J --> K[JSON Response]
+```
+
 ## Key design patterns
 
 ### Global modules
