@@ -121,53 +121,51 @@ See `src/resource/resource.ws-policy.ts` for the full example.
 
 ---
 
-## Skill Claude Code
+## Claude Code skill
 
-Le projet dispose d'un skill Claude Code dédié (`/armature`) qui encode toutes
-les conventions ci-dessus sous forme de guide actionnable.
+A dedicated Claude Code skill (`/armature`) encodes all the conventions above
+as an actionable guide.
 
-### Utilisation
+### Usage
 
-Tape `/armature` dans n'importe quelle conversation pour charger le guide
-complet : codes d'erreur, sérialisation, guards, WebSocket, modules optionnels,
-checklist finale.
+Type `/armature` in any conversation to load the full guide: error codes,
+serialization, guards, WebSocket patterns, optional modules, final checklist.
 
-### Contenu du skill
+### Skill sections
 
-| Section | Ce qu'elle couvre |
-|---------|-------------------|
-| Codes d'erreur | `ErrorCode`, mise à jour des deux fichiers de traduction |
-| Sérialisation | `serialize()` + `@Expose()`, DTOs paginés |
-| Guards & décorateurs | Tableau de référence complet |
-| Conventions controller | `@ApiTags`, `@ApiBearerAuth`, params, pagination |
-| Conventions service | Injection, fire-and-forget WS, logger structuré |
-| Nouveau module | Séquence scaffold → service → controller → app.module |
-| WebSocket | Émission, politiques d'accès par event et par room |
-| Modules optionnels | Pattern `DynamicModule` avec check env var |
-| Variables d'env | Zod schema, `.env.example` |
-| Erreurs courantes | Tableau mauvaises vs bonnes pratiques |
-| Checklist finale | À valider avant chaque commit |
+| Section | What it covers |
+|---------|----------------|
+| Error codes | `ErrorCode`, updating both translation files |
+| Serialization | `serialize()` + `@Expose()`, paginated DTOs |
+| Guards & decorators | Full reference table |
+| Controller conventions | `@ApiTags`, `@ApiBearerAuth`, params, pagination |
+| Service conventions | Injection, fire-and-forget WS, structured logger |
+| New module | Scaffold → service → controller → app.module sequence |
+| WebSocket | Emitting, per-event and per-room access policies |
+| Optional modules | `DynamicModule` pattern with env var check |
+| Env variables | Zod schema, `.env.example` |
+| Common mistakes | Bad vs. good practices table |
+| Final checklist | To validate before every commit |
 
 ---
 
-## MCP Armature
+## MCP server
 
-Un serveur MCP (Model Context Protocol) est disponible dans `mcp/`. Il expose
-les endpoints du backend comme outils utilisables directement par Claude.
+An MCP (Model Context Protocol) server lives in `mcp/`. It exposes the backend
+endpoints as tools that Claude can call directly.
 
 ### Setup
 
-```bash
-cd mcp && npm install
-```
+No extra install needed — the MCP uses the root project's `node_modules`.
+Just make sure you have run `npm install` at the project root.
 
-Le MCP se connecte au backend via `ARMATURE_BASE_URL` (défaut: `http://localhost:3000`).
-Un token JWT peut être pré-chargé via `ARMATURE_TOKEN`.
+The MCP connects to the backend via `ARMATURE_BASE_URL` (default:
+`http://localhost:3000`). A JWT can be pre-loaded via `ARMATURE_TOKEN`.
 
-### Outils disponibles
+### Available tools
 
-| Outil | Endpoint |
-|-------|----------|
+| Tool | Endpoint |
+|------|----------|
 | `auth_methods` | GET /api/auth/methods |
 | `auth_register` | POST /api/auth/register |
 | `auth_login` | POST /api/auth/login |
@@ -180,8 +178,8 @@ Un token JWT peut être pré-chargé via `ARMATURE_TOKEN`.
 | `resource_delete` | DELETE /api/resources/:id |
 | `health_check` | GET /health |
 
-Le MCP est enregistré dans `.claude/settings.json`. Il démarre automatiquement
-avec Claude Code.
+The MCP is registered in `.claude/settings.json` and starts automatically
+with Claude Code.
 
 ---
 
