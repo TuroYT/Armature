@@ -121,6 +121,76 @@ See `src/resource/resource.ws-policy.ts` for the full example.
 
 ---
 
+## Claude Code skill
+
+A dedicated Claude Code skill (`/armature`) encodes all the conventions above
+as an actionable guide.
+
+### Usage
+
+Type `/armature` in any conversation to load the full guide: error codes,
+serialization, guards, WebSocket patterns, optional modules, final checklist.
+
+### Skill sections
+
+| Section | What it covers |
+|---------|----------------|
+| Error codes | `ErrorCode`, updating both translation files |
+| Serialization | `serialize()` + `@Expose()`, paginated DTOs |
+| Guards & decorators | Full reference table |
+| Controller conventions | `@ApiTags`, `@ApiBearerAuth`, params, pagination |
+| Service conventions | Injection, fire-and-forget WS, structured logger |
+| New module | Scaffold → service → controller → app.module sequence |
+| WebSocket | Emitting, per-event and per-room access policies |
+| Optional modules | `DynamicModule` pattern with env var check |
+| Env variables | Zod schema, `.env.example` |
+| Common mistakes | Bad vs. good practices table |
+| Final checklist | To validate before every commit |
+
+---
+
+## MCP server
+
+An MCP (Model Context Protocol) server lives in `mcp/`. It exposes the backend
+endpoints as tools that Claude can call directly.
+
+### Setup
+
+No extra install needed — the MCP uses the root project's `node_modules`.
+Just make sure you have run `npm install` at the project root.
+
+The MCP connects to the backend via `ARMATURE_BASE_URL` (default:
+`http://localhost:3000`). A JWT can be pre-loaded via `ARMATURE_TOKEN`.
+
+### Session persistence
+
+After `auth_login` or `auth_register`, both tokens are written to
+`.claude/.armature-session.json` (git-ignored). The session is reloaded on
+every MCP startup — no need to log in again after restarting Claude Code.
+`auth_logout` deletes the file.
+
+### Available tools
+
+| Tool | Endpoint |
+|------|----------|
+| `auth_methods` | GET /api/auth/methods |
+| `auth_register` | POST /api/auth/register |
+| `auth_login` | POST /api/auth/login |
+| `auth_refresh` | POST /api/auth/refresh |
+| `auth_logout` | POST /api/auth/logout |
+| `auth_me` | GET /api/auth/me |
+| `resource_list` | GET /api/resources |
+| `resource_get` | GET /api/resources/:id |
+| `resource_create` | POST /api/resources |
+| `resource_update` | PATCH /api/resources/:id |
+| `resource_delete` | DELETE /api/resources/:id |
+| `health_check` | GET /health |
+
+The MCP is registered in `.claude/settings.json` and starts automatically
+with Claude Code. Full documentation: [`docs/mcp.md`](docs/mcp.md).
+
+---
+
 ## Environment variables
 
 See `.env.example` and `src/config/env.validation.ts` (Zod schema) for the

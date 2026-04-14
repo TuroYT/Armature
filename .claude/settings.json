@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "armature": {
+      "command": "./node_modules/.bin/tsx",
+      "args": ["mcp/src/index.ts"],
+      "env": {
+        "ARMATURE_BASE_URL": "http://localhost:3000"
+      }
+    }
+  }
+}
