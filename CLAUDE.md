@@ -121,6 +121,70 @@ See `src/resource/resource.ws-policy.ts` for the full example.
 
 ---
 
+## Skill Claude Code
+
+Le projet dispose d'un skill Claude Code dédié (`/armature`) qui encode toutes
+les conventions ci-dessus sous forme de guide actionnable.
+
+### Utilisation
+
+Tape `/armature` dans n'importe quelle conversation pour charger le guide
+complet : codes d'erreur, sérialisation, guards, WebSocket, modules optionnels,
+checklist finale.
+
+### Contenu du skill
+
+| Section | Ce qu'elle couvre |
+|---------|-------------------|
+| Codes d'erreur | `ErrorCode`, mise à jour des deux fichiers de traduction |
+| Sérialisation | `serialize()` + `@Expose()`, DTOs paginés |
+| Guards & décorateurs | Tableau de référence complet |
+| Conventions controller | `@ApiTags`, `@ApiBearerAuth`, params, pagination |
+| Conventions service | Injection, fire-and-forget WS, logger structuré |
+| Nouveau module | Séquence scaffold → service → controller → app.module |
+| WebSocket | Émission, politiques d'accès par event et par room |
+| Modules optionnels | Pattern `DynamicModule` avec check env var |
+| Variables d'env | Zod schema, `.env.example` |
+| Erreurs courantes | Tableau mauvaises vs bonnes pratiques |
+| Checklist finale | À valider avant chaque commit |
+
+---
+
+## MCP Armature
+
+Un serveur MCP (Model Context Protocol) est disponible dans `mcp/`. Il expose
+les endpoints du backend comme outils utilisables directement par Claude.
+
+### Setup
+
+```bash
+cd mcp && npm install
+```
+
+Le MCP se connecte au backend via `ARMATURE_BASE_URL` (défaut: `http://localhost:3000`).
+Un token JWT peut être pré-chargé via `ARMATURE_TOKEN`.
+
+### Outils disponibles
+
+| Outil | Endpoint |
+|-------|----------|
+| `auth_methods` | GET /api/auth/methods |
+| `auth_register` | POST /api/auth/register |
+| `auth_login` | POST /api/auth/login |
+| `auth_logout` | POST /api/auth/logout |
+| `auth_me` | GET /api/auth/me |
+| `resource_list` | GET /api/resources |
+| `resource_get` | GET /api/resources/:id |
+| `resource_create` | POST /api/resources |
+| `resource_update` | PATCH /api/resources/:id |
+| `resource_delete` | DELETE /api/resources/:id |
+| `health_check` | GET /health |
+
+Le MCP est enregistré dans `.claude/settings.json`. Il démarre automatiquement
+avec Claude Code.
+
+---
+
 ## Environment variables
 
 See `.env.example` and `src/config/env.validation.ts` (Zod schema) for the
