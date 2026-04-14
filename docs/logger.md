@@ -54,7 +54,9 @@ The minimum level is controlled by `LOG_LEVEL` (default: `DEBUG`). Messages belo
 
 ## Rules
 
-- **Never** use `console.log` or `console.error` — always inject `LoggerService`
+!!! danger "No console.log"
+    Never use `console.log` or `console.error`. They bypass log levels, produce unstyled output in development, and unstructured text in production. Always inject `LoggerService`.
+
 - Always call `logger.withContext('ClassName')` in the constructor
 - Pass structured data as the second argument — never interpolate it into the message string
 - HTTP request logging and unhandled exception logging are **automatic** (global interceptor + filter) — do not re-log them manually in controllers

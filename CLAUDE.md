@@ -198,3 +198,102 @@ full list. The app crashes at startup if required variables are missing.
 
 Required: `DATABASE_URL`, `JWT_SECRET` (≥ 32 chars), `JWT_REFRESH_SECRET`
 Optional: `REDIS_URL`, `STRIPE_SECRET_KEY`, `GOOGLE_CLIENT_ID/SECRET`, `CORS_ORIGIN`
+
+---
+
+## Documentation (`docs/` + `mkdocs.yml`)
+
+Every new Markdown file added under `docs/` **must** also be registered in the
+`nav:` section of `mkdocs.yml`. Forgetting this step means the page is silently
+excluded from the published site.
+
+### Current nav structure
+
+```
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - Architecture: architecture.md
+  - Core:
+    - Authentication: authentication.md
+    - RBAC: rbac.md
+    - Logger: logger.md
+    - Error Codes & i18n: error-codes.md
+    - Optional Modules: optional-modules.md
+  - Real-time:
+    - WebSocket: websocket.md
+  - Integrations:
+    - Adding a Social Provider: adding-social-provider.md
+    - MCP Server: mcp.md
+```
+
+### Rules
+
+- Place new pages in the most relevant section (`Core`, `Real-time`, `Integrations`, …).
+- Create a new top-level section only for genuinely distinct feature areas.
+- Keep section names short (one or two words).
+- After adding a page, verify locally with `mkdocs serve` that it appears in the sidebar.
+
+### Writing style — use Material for MkDocs features
+
+The site uses **Material for MkDocs** with the full feature set enabled. Every
+doc page must use these constructs instead of plain prose wherever they add
+clarity.
+
+#### Admonitions — mandatory for callouts
+
+Never bury a warning or tip in a plain paragraph. Use the appropriate type:
+
+| Type | When to use |
+|------|-------------|
+| `!!! danger` | Irreversible actions, security issues, data loss risks |
+| `!!! warning` | Behaviour that surprises developers; easy-to-make mistakes |
+| `!!! note` | Neutral clarifications that the reader must not miss |
+| `!!! info` | Background context or "how it works" asides |
+| `!!! tip` | Best-practice shortcuts and recommended patterns |
+
+```markdown
+!!! warning "connect_error vs error"
+    Auth failures surface as `connect_error`, **not** `error`.
+    Always listen to both events on the client.
+```
+
+Content must be **indented by 4 spaces** under the opening line.
+
+#### Mermaid diagrams — replace ASCII art
+
+Every ASCII flow (`──►`, `│`, `▼`, `└──`) must be replaced with a fenced
+`mermaid` block. Pick the right diagram type:
+
+| Situation | Diagram type |
+|-----------|-------------|
+| Request/response between actors | `sequenceDiagram` |
+| State machine or data flow | `flowchart TD` / `flowchart LR` |
+| Database relations | `erDiagram` |
+
+```markdown
+​```mermaid
+sequenceDiagram
+    participant C as Client
+    participant S as Server
+    C->>S: POST /api/auth/login
+    S-->>C: { accessToken, refreshToken }
+​```
+```
+
+#### Tabs — for mutually exclusive alternatives
+
+Use `===` tabs whenever the reader has to choose between options
+(dev vs prod, correct vs wrong, framework A vs B):
+
+```markdown
+=== "Development"
+    ```bash
+    npm run start:dev
+    ```
+
+=== "Production"
+    ```bash
+    npm run build && node dist/main.js
+    ```
+```

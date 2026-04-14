@@ -36,17 +36,25 @@ RESOURCE_ALREADY_EXISTS;
 
 ## Usage
 
-```ts
-import { ErrorCode } from '../common/constants/error-constants.js';
-import { NotFoundException, ForbiddenException } from '@nestjs/common';
+=== "Correct"
 
-// Correct
-throw new NotFoundException(ErrorCode.RESOURCE_NOT_FOUND);
-throw new ForbiddenException(ErrorCode.FORBIDDEN);
+    ```ts
+    import { ErrorCode } from '../common/constants/error-constants.js';
+    import { NotFoundException, ForbiddenException } from '@nestjs/common';
 
-// Wrong — never do this
-throw new NotFoundException('Resource not found');
-```
+    throw new NotFoundException(ErrorCode.RESOURCE_NOT_FOUND);
+    throw new ForbiddenException(ErrorCode.FORBIDDEN);
+    ```
+
+=== "Wrong"
+
+    ```ts
+    // Never pass raw strings — translations won't work
+    throw new NotFoundException('Resource not found');
+    ```
+
+!!! danger "Never throw raw strings"
+    Raw strings bypass the i18n pipeline. The client receives an untranslated, non-machine-readable message that breaks structured error handling on the frontend.
 
 ## Error response shape
 

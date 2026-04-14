@@ -1,8 +1,9 @@
 site_name: Armature
-site_description: Opinionated NestJS boilerplate — Prisma, JWT auth, RBAC, typed errors, i18n, optional Redis/BullMQ, Stripe and Google OAuth.
+site_description: Opinionated NestJS boilerplate — Prisma, JWT auth, RBAC, typed errors, i18n, WebSocket, MCP, optional Redis/BullMQ, Stripe and Google OAuth.
 site_url: https://turoyt.github.io/Armature
 repo_url: https://github.com/TuroYT/Armature
 repo_name: TuroYT/Armature
+edit_uri: edit/main/docs/
 
 theme:
   name: material
@@ -22,33 +23,61 @@ theme:
         icon: material/brightness-4
         name: Switch to light mode
   features:
+    - navigation.instant
+    - navigation.tracking
     - navigation.tabs
     - navigation.sections
+    - navigation.expand
     - navigation.top
+    - navigation.footer
+    - toc.follow
     - search.suggest
     - search.highlight
+    - search.share
     - content.code.copy
     - content.code.annotate
+    - content.action.edit
+
+plugins:
+  - search:
+      lang: en
 
 markdown_extensions:
   - admonition
   - pymdownx.details
-  - pymdownx.superfences
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.highlight:
       anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
   - pymdownx.inlinehilite
   - pymdownx.tabbed:
       alternate_style: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
   - tables
   - attr_list
+  - md_in_html
+  - toc:
+      permalink: true
 
 nav:
   - Home: index.md
   - Getting Started: getting-started.md
   - Architecture: architecture.md
-  - Authentication: authentication.md
-  - RBAC: rbac.md
-  - Logger: logger.md
-  - Optional Modules: optional-modules.md
-  - Error Codes & i18n: error-codes.md
-  - Adding a Social Provider: adding-social-provider.md
+  - Core:
+    - Authentication: authentication.md
+    - RBAC: rbac.md
+    - Logger: logger.md
+    - Error Codes & i18n: error-codes.md
+    - Optional Modules: optional-modules.md
+  - Real-time:
+    - WebSocket: websocket.md
+  - Integrations:
+    - Adding a Social Provider: adding-social-provider.md
+    - MCP Server: mcp.md

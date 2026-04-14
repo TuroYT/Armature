@@ -2,6 +2,9 @@
 
 Armature is designed so that adding a new OAuth provider (GitHub, Apple, Discord…) requires touching **only the new provider's files**. No changes to `AuthService`, `AuthController`, or `AppModule` are needed.
 
+!!! tip "Isolation by design"
+    The `SOCIAL_PROVIDER` multi-token and the `static register()` pattern ensure each provider is fully self-contained. The rest of the app discovers it automatically at startup.
+
 ## How it works
 
 Each provider module:
@@ -192,3 +195,6 @@ imports: [
 ```
 
 That's it. The GitHub routes appear in Swagger when the module is active, and `GET /api/auth/methods` includes `{ id: 'github', label: 'GitHub', enabled: true }` automatically.
+
+!!! info "No email from GitHub?"
+    Some GitHub accounts don't expose a primary email via the API. The strategy above handles this with an early `done(new Error(...))` — make sure your frontend handles `connect_error` accordingly.

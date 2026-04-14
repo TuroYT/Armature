@@ -55,8 +55,10 @@ the refresh token are written to `.claude/.armature-session.json`:
 ```
 
 This file is loaded at server startup, so the session survives MCP restarts
-(e.g. after closing and reopening Claude Code). It is listed in `.gitignore`
-and must never be committed.
+(e.g. after closing and reopening Claude Code).
+
+!!! danger "Never commit the session file"
+    `.claude/.armature-session.json` contains live JWT tokens. It is listed in `.gitignore` — verify it stays excluded before every push.
 
 `auth_logout` deletes the file and clears the in-memory tokens.
 
@@ -64,27 +66,22 @@ and must never be committed.
 
 ## Authentication flow
 
-```
-auth_login / auth_register
-        │
-        ▼
-  saveSession()  ──→  .claude/.armature-session.json
-        │
-        ▼
-  (use tools freely)
-        │
-  access token expires?
-        │
-        ▼
-  auth_refresh  ──→  new pair saved to session file
-        │
-        ▼
-  auth_logout  ──→  session file deleted
+```mermaid
+flowchart TD
+    A["auth_login / auth_register"] --> B["saveSession()"]
+    B --> C[".claude/.armature-session.json"]
+    B --> D["Use tools freely"]
+    D --> E{"HTTP 401?"}
+    E -- No --> D
+    E -- Yes --> F["auth_refresh"]
+    F --> G["New pair saved to session file"]
+    G --> D
+    D --> H["auth_logout"]
+    H --> I["Session file deleted"]
 ```
 
-**Rule**: if any authenticated tool returns `HTTP 401`, call `auth_refresh`
-then retry the original tool. If `auth_refresh` also fails, call `auth_login`
-again.
+!!! tip "Handling 401s"
+    If any authenticated tool returns `HTTP 401`, call `auth_refresh` then retry the original tool. If `auth_refresh` also fails, call `auth_login` again.
 
 ---
 

@@ -60,7 +60,7 @@ cp .env.example .env
 | `GOOGLE_CLIENT_SECRET` | Google OAuth client secret |
 
 !!! warning
-The app **crashes at startup** if a required variable is missing or malformed. Optional variables are safely ignored when absent.
+    The app **crashes at startup** if a required variable is missing or malformed. Optional variables are safely ignored when absent.
 
 ## Database setup
 
@@ -80,22 +80,30 @@ The seed creates:
 
 ## Running
 
-```bash
-# Development (hot reload)
-npm run start:dev
+=== "Development"
 
-# Production
-npm run build
-node dist/main.js
-```
+    Hot-reload via `ts-node`:
 
-## Docker
+    ```bash
+    npm run start:dev
+    ```
 
-```bash
-docker compose up
-```
+=== "Production"
 
-The bundled `docker-compose.yml` starts PostgreSQL and the app together.
+    Compile then run:
+
+    ```bash
+    npm run build
+    node dist/main.js
+    ```
+
+=== "Docker"
+
+    Starts PostgreSQL and the app together:
+
+    ```bash
+    docker compose up
+    ```
 
 ## Useful commands
 

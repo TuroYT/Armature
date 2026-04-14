@@ -54,8 +54,11 @@ never enter the connected state and cannot emit or receive any events.
 4. On failure (missing, expired, or invalid token) the handshake is **rejected
    immediately** — the client receives a `connect_error` event (not `error`).
 
-The global `JwtAuthGuard` used by the REST API is HTTP-only and does **not**
-apply to WebSocket connections.
+!!! warning "connect_error vs error"
+    Authentication failures during the handshake surface as `connect_error`, **not** `error`. Make sure your client listens to both events.
+
+!!! info "HTTP guard does not apply"
+    The global `JwtAuthGuard` used by the REST API is HTTP-only. WebSocket auth happens entirely in the `server.use()` middleware registered in `afterInit()`.
 
 ---
 
@@ -72,6 +75,9 @@ When `WebsocketGateway.emit(event, data)` is called:
 2. **No policy** → event is broadcast to **all** connected clients (open by default).
 3. **Policy found** → the payload is evaluated for each connected socket; only
    clients for whom `policy(user, payload) === true` receive the event.
+
+!!! tip "Default is open"
+    Events without a registered policy are broadcast to every authenticated client. Register a policy as soon as an event carries user-specific or sensitive data.
 
 The same logic applies to `emitToRoom()`.
 
@@ -307,5 +313,5 @@ src/resource/
 └── resource.ws-policy.ts             Example domain policy (owner / admin rules)
 ```
 
-The gateway reuses the same HTTP port — no extra port or infrastructure needed.
-CORS is configured via the `CORS_ORIGIN` environment variable (same as the REST API).
+!!! info "No extra port"
+    The gateway reuses the same HTTP port as the REST API. CORS is configured via the `CORS_ORIGIN` environment variable.

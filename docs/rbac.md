@@ -6,10 +6,11 @@ Access control is **fully stored in the database**. Adding a new role or permiss
 
 ## Data model
 
-```
-User ──n:n── Role ──n:n── Permission
- │                             ▲
- └───────────────────────n:n───┘  (UserPermission — direct overrides)
+```mermaid
+erDiagram
+    User }o--o{ Role : "UserRole"
+    Role }o--o{ Permission : "RolePermission"
+    User }o--o{ Permission : "UserPermission (direct override)"
 ```
 
 | Model            | Description                                                     |
@@ -28,6 +29,9 @@ A user's effective permissions are the **union** of:
 2. All permissions directly assigned to them (`UserPermission`)
 
 Users with the **`admin` role bypass all permission checks**.
+
+!!! info "Admin shortcut"
+    A user with the `admin` role always passes `PermissionsGuard` and `RolesGuard`, regardless of which permissions are configured.
 
 ## Default roles (seed)
 
@@ -95,6 +99,9 @@ When `REDIS_URL` is set, resolved permission sets are cached per user with a **5
 - Cache miss → DB query, result stored in cache
 
 **Invalidation:** call `CacheService.del('permissions:{userId}')` whenever a user's roles or direct permissions change.
+
+!!! warning "Cache staleness"
+    If you update a user's roles or permissions without invalidating the cache, the old permission set is served for up to 5 minutes. Always call `CacheService.del()` after a permission change.
 
 ```ts
 // Example: after updating a user's roles
