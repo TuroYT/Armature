@@ -198,3 +198,38 @@ full list. The app crashes at startup if required variables are missing.
 
 Required: `DATABASE_URL`, `JWT_SECRET` (≥ 32 chars), `JWT_REFRESH_SECRET`
 Optional: `REDIS_URL`, `STRIPE_SECRET_KEY`, `GOOGLE_CLIENT_ID/SECRET`, `CORS_ORIGIN`
+
+---
+
+## Documentation (`docs/` + `mkdocs.yml`)
+
+Every new Markdown file added under `docs/` **must** also be registered in the
+`nav:` section of `mkdocs.yml`. Forgetting this step means the page is silently
+excluded from the published site.
+
+### Current nav structure
+
+```
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - Architecture: architecture.md
+  - Core:
+    - Authentication: authentication.md
+    - RBAC: rbac.md
+    - Logger: logger.md
+    - Error Codes & i18n: error-codes.md
+    - Optional Modules: optional-modules.md
+  - Real-time:
+    - WebSocket: websocket.md
+  - Integrations:
+    - Adding a Social Provider: adding-social-provider.md
+    - MCP Server: mcp.md
+```
+
+### Rules
+
+- Place new pages in the most relevant section (`Core`, `Real-time`, `Integrations`, …).
+- Create a new top-level section only for genuinely distinct feature areas.
+- Keep section names short (one or two words).
+- After adding a page, verify locally with `mkdocs serve` that it appears in the sidebar.
