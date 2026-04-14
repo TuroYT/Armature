@@ -52,5 +52,8 @@ pids
 # Prisma generated client
 /generated/prisma
 
+# MCP session (contains JWT tokens — never commit)
+.claude/.armature-session.json
+
 # Dev
 .vscode

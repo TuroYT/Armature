@@ -6,26 +6,62 @@ import {
   ListToolsRequestSchema,
   type Tool,
 } from '@modelcontextprotocol/sdk/types.js';
+import { existsSync, readFileSync, writeFileSync, unlinkSync } from 'fs';
+import { join } from 'path';
 
+// ---------------------------------------------------------------------------
+// Session persistence
+// ---------------------------------------------------------------------------
+
+const SESSION_FILE = join(process.cwd(), '.claude', '.armature-session.json');
+
+interface Session {
+  accessToken: string;
+  refreshToken: string;
+}
+
+function loadSession(): Session | null {
+  try {
+    if (existsSync(SESSION_FILE)) {
+      return JSON.parse(readFileSync(SESSION_FILE, 'utf-8')) as Session;
+    }
+  } catch { /* ignore corrupt file */ }
+  return null;
+}
+
+function saveSession(session: Session): void {
+  writeFileSync(SESSION_FILE, JSON.stringify(session, null, 2), 'utf-8');
+}
+
+function clearSession(): void {
+  try { unlinkSync(SESSION_FILE); } catch { /* ignore */ }
+}
+
+// Startup: env var takes priority, then persisted session
+const stored = loadSession();
 const BASE_URL = process.env['ARMATURE_BASE_URL'] ?? 'http://localhost:3000';
-
-/** JWT stored in memory after auth_login / auth_register */
-let accessToken: string | null = process.env['ARMATURE_TOKEN'] ?? null;
+let accessToken: string | null = process.env['ARMATURE_TOKEN'] ?? stored?.accessToken ?? null;
+let refreshToken: string | null = stored?.refreshToken ?? null;
 
 // ---------------------------------------------------------------------------
-// HTTP helpers
+// HTTP helper
 // ---------------------------------------------------------------------------
 
+/**
+ * @param authToken  Pass a token string to use it as Bearer.
+ *                   Pass null to send no Authorization header (public routes).
+ *                   Omit to use the current accessToken.
+ */
 async function apiCall<T>(
   method: string,
   path: string,
   body?: unknown,
-  auth = true,
+  authToken?: string | null,
 ): Promise<T> {
+  const token = authToken === undefined ? accessToken : authToken;
+
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (auth && accessToken) {
-    headers['Authorization'] = `Bearer ${accessToken}`;
-  }
+  if (token) headers['Authorization'] = `Bearer ${token}`;
 
   const res = await fetch(`${BASE_URL}${path}`, {
     method,
@@ -35,11 +71,7 @@ async function apiCall<T>(
 
   const text = await res.text();
   let data: unknown;
-  try {
-    data = JSON.parse(text);
-  } catch {
-    data = text;
-  }
+  try { data = JSON.parse(text); } catch { data = text; }
 
   if (!res.ok) {
     const message =
@@ -53,6 +85,7 @@ async function apiCall<T>(
 }
 
 type AuthResponse = { accessToken: string; refreshToken: string; user: unknown };
+type TokensResponse = { accessToken: string; refreshToken: string };
 
 // ---------------------------------------------------------------------------
 // Tool definitions
@@ -62,13 +95,14 @@ const TOOLS: Tool[] = [
   // ── Auth ──────────────────────────────────────────────────────────────────
   {
     name: 'auth_methods',
-    description: 'List available authentication methods (password, Google OAuth…)',
+    description: 'List available authentication methods (password, Google OAuth…).',
     inputSchema: { type: 'object', properties: {} },
   },
   {
     name: 'auth_register',
     description:
-      'Register a new user account. Stores the JWT automatically for subsequent calls.',
+      'Register a new user account. Persists the access + refresh tokens to ' +
+      '.claude/.armature-session.json for use across MCP restarts.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -83,7 +117,8 @@ const TOOLS: Tool[] = [
   {
     name: 'auth_login',
     description:
-      'Log in with email and password. Stores the JWT automatically for subsequent calls.',
+      'Log in with email and password. Persists the access + refresh tokens to ' +
+      '.claude/.armature-session.json for use across MCP restarts.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -94,14 +129,25 @@ const TOOLS: Tool[] = [
     },
   },
   {
+    name: 'auth_refresh',
+    description:
+      'Rotate the token pair using the stored refresh token. ' +
+      'Call this automatically when any tool returns HTTP 401.',
+    inputSchema: { type: 'object', properties: {} },
+  },
+  {
     name: 'auth_logout',
-    description: 'Invalidate the current session. Clears the stored JWT.',
+    description:
+      'Invalidate the session on the server and delete the local session file. ' +
+      'Uses the stored refresh token if none is provided.',
     inputSchema: {
       type: 'object',
       properties: {
-        refreshToken: { type: 'string', description: 'Refresh token to invalidate' },
+        refreshToken: {
+          type: 'string',
+          description: 'Refresh token to invalidate. Defaults to the stored one.',
+        },
       },
-      required: ['refreshToken'],
     },
   },
   {
@@ -140,10 +186,7 @@ const TOOLS: Tool[] = [
       type: 'object',
       properties: {
         name: { type: 'string', description: 'Resource name (max 100 chars)' },
-        description: {
-          type: 'string',
-          description: 'Optional description (max 500 chars)',
-        },
+        description: { type: 'string', description: 'Optional description (max 500 chars)' },
       },
       required: ['name'],
     },
@@ -185,31 +228,48 @@ const TOOLS: Tool[] = [
 // Tool handler
 // ---------------------------------------------------------------------------
 
-async function handleTool(
-  name: string,
-  args: Record<string, unknown>,
-): Promise<unknown> {
+async function handleTool(name: string, args: Record<string, unknown>): Promise<unknown> {
   switch (name) {
     // Auth
     case 'auth_methods':
-      return apiCall('GET', '/api/auth/methods', undefined, false);
+      return apiCall('GET', '/api/auth/methods', undefined, null);
 
     case 'auth_register': {
-      const result = await apiCall<AuthResponse>('POST', '/api/auth/register', args, false);
+      const result = await apiCall<AuthResponse>('POST', '/api/auth/register', args, null);
       accessToken = result.accessToken;
-      return { message: 'Registered and logged in', user: result.user, refreshToken: result.refreshToken };
+      refreshToken = result.refreshToken;
+      saveSession({ accessToken, refreshToken });
+      return { message: 'Registered and logged in. Session persisted.', user: result.user };
     }
 
     case 'auth_login': {
-      const result = await apiCall<AuthResponse>('POST', '/api/auth/login', args, false);
+      const result = await apiCall<AuthResponse>('POST', '/api/auth/login', args, null);
       accessToken = result.accessToken;
-      return { message: 'Logged in', user: result.user, refreshToken: result.refreshToken };
+      refreshToken = result.refreshToken;
+      saveSession({ accessToken, refreshToken });
+      return { message: 'Logged in. Session persisted.', user: result.user };
+    }
+
+    case 'auth_refresh': {
+      if (!refreshToken) {
+        throw new Error('No refresh token in session. Call auth_login first.');
+      }
+      // The jwt-refresh strategy reads the token from the Authorization Bearer header
+      const result = await apiCall<TokensResponse>('POST', '/api/auth/refresh', undefined, refreshToken);
+      accessToken = result.accessToken;
+      refreshToken = result.refreshToken;
+      saveSession({ accessToken, refreshToken });
+      return { message: 'Token pair rotated. Session persisted.' };
     }
 
     case 'auth_logout': {
-      await apiCall('POST', '/api/auth/logout', { refreshToken: args['refreshToken'] });
+      const token = (args['refreshToken'] as string | undefined) ?? refreshToken;
+      if (!token) throw new Error('No refresh token available. Already logged out?');
+      await apiCall('POST', '/api/auth/logout', { refreshToken: token });
       accessToken = null;
-      return { message: 'Logged out' };
+      refreshToken = null;
+      clearSession();
+      return { message: 'Logged out. Session file deleted.' };
     }
 
     case 'auth_me':
@@ -237,11 +297,11 @@ async function handleTool(
 
     case 'resource_delete':
       await apiCall('DELETE', `/api/resources/${args['id']}`);
-      return { message: 'Resource deleted' };
+      return { message: 'Resource deleted.' };
 
     // Health
     case 'health_check':
-      return apiCall('GET', '/health', undefined, false);
+      return apiCall('GET', '/health', undefined, null);
 
     default:
       throw new Error(`Unknown tool: ${name}`);
@@ -263,15 +323,10 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
   const { name, arguments: args = {} } = req.params;
   try {
     const result = await handleTool(name, args as Record<string, unknown>);
-    return {
-      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-    };
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    return {
-      content: [{ type: 'text', text: `Error: ${message}` }],
-      isError: true,
-    };
+    return { content: [{ type: 'text', text: `Error: ${message}` }], isError: true };
   }
 });
 

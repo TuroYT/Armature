@@ -162,6 +162,13 @@ Just make sure you have run `npm install` at the project root.
 The MCP connects to the backend via `ARMATURE_BASE_URL` (default:
 `http://localhost:3000`). A JWT can be pre-loaded via `ARMATURE_TOKEN`.
 
+### Session persistence
+
+After `auth_login` or `auth_register`, both tokens are written to
+`.claude/.armature-session.json` (git-ignored). The session is reloaded on
+every MCP startup — no need to log in again after restarting Claude Code.
+`auth_logout` deletes the file.
+
 ### Available tools
 
 | Tool | Endpoint |
@@ -169,6 +176,7 @@ The MCP connects to the backend via `ARMATURE_BASE_URL` (default:
 | `auth_methods` | GET /api/auth/methods |
 | `auth_register` | POST /api/auth/register |
 | `auth_login` | POST /api/auth/login |
+| `auth_refresh` | POST /api/auth/refresh |
 | `auth_logout` | POST /api/auth/logout |
 | `auth_me` | GET /api/auth/me |
 | `resource_list` | GET /api/resources |
@@ -179,7 +187,7 @@ The MCP connects to the backend via `ARMATURE_BASE_URL` (default:
 | `health_check` | GET /health |
 
 The MCP is registered in `.claude/settings.json` and starts automatically
-with Claude Code.
+with Claude Code. Full documentation: [`docs/mcp.md`](docs/mcp.md).
 
 ---
 
