@@ -53,7 +53,9 @@ export class ResourceService {
       ? { name: { contains: query.q, mode: 'insensitive' as const } }
       : {};
 
-    const [items, total] = await Promise.all([
+    // Single round-trip: list + count run inside one transaction so they see
+    // a consistent snapshot of the table even when concurrent writes occur.
+    const [items, total] = await this.prisma.$transaction([
       this.prisma.resource.findMany({
         where,
         skip,

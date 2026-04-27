@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
+import { z } from 'zod';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { CacheService } from '../cache/cache.service.js';
 import { ErrorCode } from '../common/constants/error-constants.js';
@@ -16,6 +17,13 @@ export const PERMISSIONS_KEY = 'permissions';
 
 /** Cache TTL for resolved permission sets (seconds). */
 const PERMISSIONS_CACHE_TTL = 300; // 5 minutes
+
+/**
+ * Shape of the permission list serialised in cache. We validate on read so a
+ * tampered or corrupted entry forces a clean DB re-resolution instead of
+ * crashing the request pipeline.
+ */
+const cachedPermissionsSchema = z.array(z.string());
 
 /**
  * Declare required permissions on a route.
@@ -88,7 +96,14 @@ export class PermissionsGuard implements CanActivate {
 
     const cached = await this.cache.get(cacheKey);
     if (cached) {
-      return new Set(JSON.parse(cached) as string[]);
+      const parsed = cachedPermissionsSchema.safeParse(
+        this.safeJsonParse(cached),
+      );
+      if (parsed.success) {
+        return new Set(parsed.data);
+      }
+      // Corrupted entry — drop it and fall through to DB resolution.
+      await this.cache.del(cacheKey);
     }
 
     const [rolePerms, userPerms] = await Promise.all([
@@ -114,5 +129,13 @@ export class PermissionsGuard implements CanActivate {
     );
 
     return new Set(permissionNames);
+  }
+
+  private safeJsonParse(raw: string): unknown {
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
   }
 }

@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { LoggerPort } from './logger.port.js';
 import { type LogEntry, LogLevel, LOGGER_PORT } from './logger.port.js';
+import { getCorrelationId } from '../correlation/correlation.context.js';
 
 /**
  * Application-wide logger service.
@@ -25,7 +26,7 @@ export class LoggerService {
   constructor(@Inject(LOGGER_PORT) private readonly adapter: LoggerPort) {
     const envLevel = process.env['LOG_LEVEL']?.toUpperCase();
     if (envLevel && envLevel in LogLevel) {
-      this.minLevel = LogLevel[envLevel as keyof typeof LogLevel] as LogLevel;
+      this.minLevel = LogLevel[envLevel as keyof typeof LogLevel];
     }
   }
 
@@ -60,12 +61,13 @@ export class LoggerService {
   ): void {
     if (level < this.minLevel) return;
 
+    const correlationId = getCorrelationId();
     const entry: LogEntry = {
       level,
       message,
       context: this.context,
       timestamp: new Date().toISOString(),
-      meta,
+      meta: correlationId ? { correlationId, ...meta } : meta,
     };
 
     this.adapter.write(entry);

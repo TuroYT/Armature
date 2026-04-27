@@ -4,9 +4,11 @@ import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
+import helmet from 'helmet';
 import { readFileSync } from 'fs';
 import { AppModule } from './app.module.js';
 import { WsAdapter } from './websocket/ws.adapter.js';
+import { LoggerService } from './common/logger/logger.service.js';
 import type { Env } from './config/env.validation.js';
 
 function getPackageVersion(): string {
@@ -32,6 +34,10 @@ async function bootstrap() {
   app.useWebSocketAdapter(new WsAdapter(app));
 
   // ── Middleware ────────────────────────────────────────────────────────────
+  // Helmet sets sensible HTTP security headers (XSS, clickjacking, sniffing…).
+  // CSP is disabled because the Swagger UI assets we serve in dev would be
+  // blocked otherwise; turn it back on in front of a hardened reverse proxy.
+  app.use(helmet({ contentSecurityPolicy: isProduction ? undefined : false }));
   app.use(cookieParser());
   app.enableCors({
     // CORS_ORIGIN set → use it. Production without it → deny cross-origin
@@ -71,9 +77,10 @@ async function bootstrap() {
   await app.listen(port);
 
   const url = await app.getUrl();
-  console.log(`Application running on ${url}`);
+  const logger = app.get(LoggerService).withContext('Bootstrap');
+  logger.log(`Application running on ${url}`);
   if (!isProduction) {
-    console.log(`Swagger docs: ${url}/api/docs`);
+    logger.log(`Swagger docs: ${url}/api/docs`);
   }
 }
 
