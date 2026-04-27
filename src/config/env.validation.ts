@@ -10,7 +10,9 @@ export const envSchema = z.object({
     .enum(['development', 'production', 'test'])
     .default('development'),
   PORT: z.coerce.number().int().positive().default(3000),
-  CORS_ORIGIN: z.string().optional(),
+  // CORS_ORIGIN must be an absolute URL (e.g. https://app.example.com).
+  // Wildcards are intentionally rejected: credentialed CORS forbids `*`.
+  CORS_ORIGIN: z.string().url().optional(),
 
   // Database
   DATABASE_URL: z.string().url(),
@@ -36,6 +38,9 @@ export const envSchema = z.object({
   // Optional — Google OAuth
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
+  // Defaults to `/api/auth/google/callback`. Override when running behind a
+  // reverse proxy that exposes the API under a different host or path.
+  GOOGLE_OAUTH_CALLBACK_URL: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

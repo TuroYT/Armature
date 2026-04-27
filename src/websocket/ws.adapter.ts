@@ -35,6 +35,10 @@ export class WsAdapter extends IoAdapter {
         : {};
     return super.createIOServer(port, {
       ...options,
+      // Cap inbound payloads at 100 KB. Socket.IO's default (1 MB) lets a
+      // single client trivially saturate memory; real-time business events
+      // are tiny so this guardrail is a free win against DoS.
+      maxHttpBufferSize: options?.maxHttpBufferSize ?? 100_000,
       cors: {
         ...existingCors,
         // CORS_ORIGIN set → use it (all environments).

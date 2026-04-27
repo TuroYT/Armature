@@ -1,4 +1,4 @@
-import { DynamicModule, Logger, Module } from '@nestjs/common';
+import { DynamicModule, Logger, Module, type Provider } from '@nestjs/common';
 import { PassportModule } from '@nestjs/passport';
 import { GoogleStrategy } from './google.strategy.js';
 import { GoogleAuthController } from './google-auth.controller.js';
@@ -30,22 +30,21 @@ export class GoogleAuthModule {
       return { module: GoogleAuthModule };
     }
 
+    // Registers this provider in the global SOCIAL_PROVIDER multi-token so
+    // AuthService can expose it via GET /api/auth/methods. NestJS supports
+    // `multi: true` on value providers at runtime but its public Provider
+    // typings omit the flag, so we assemble the literal then widen.
+    const googleProvider = {
+      provide: SOCIAL_PROVIDER,
+      useValue: new GoogleSocialProvider(),
+      multi: true,
+    } as unknown as Provider;
+
     return {
       module: GoogleAuthModule,
       imports: [PassportModule.register({ defaultStrategy: 'google' })],
       controllers: [GoogleAuthController],
-      providers: [
-        SocialAuthService,
-        GoogleStrategy,
-        // Registers this provider in the global SOCIAL_PROVIDER multi-token
-        // so AuthService can expose it via GET /api/auth/methods.
-
-        {
-          provide: SOCIAL_PROVIDER,
-          useValue: new GoogleSocialProvider(),
-          multi: true,
-        } as any,
-      ],
+      providers: [SocialAuthService, GoogleStrategy, googleProvider],
     };
   }
 }

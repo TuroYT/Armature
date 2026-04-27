@@ -85,7 +85,7 @@ export class WsPolicyRegistry {
    */
   register<T>(event: string, policy: WsPolicyFn<T>): void {
     this.logger.debug(`Policy registered for event "${event}"`);
-    this.eventPolicies.set(event, policy as WsPolicyFn);
+    this.eventPolicies.set(event, policy);
   }
 
   /**

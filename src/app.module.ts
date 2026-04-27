@@ -1,6 +1,7 @@
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { CorrelationIdMiddleware } from './common/correlation/correlation-id.middleware.js';
 
 import { AppConfigModule } from './config/config.module.js';
 import { LoggerModule } from './common/logger/logger.module.js';
@@ -58,4 +59,8 @@ import { JwtAuthGuard } from './auth/auth.guard.js';
     { provide: APP_INTERCEPTOR, useClass: HttpLoggingInterceptor },
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer): void {
+    consumer.apply(CorrelationIdMiddleware).forRoutes('*');
+  }
+}

@@ -7,6 +7,9 @@ import { Public } from '../decorators/public.decorator.js';
 import { AuthService } from '../auth.service.js';
 import type { Env } from '../../config/env.validation.js';
 
+const REFRESH_COOKIE_NAME = 'armature_refresh_token';
+const REFRESH_COOKIE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
 @ApiTags('Auth — Google OAuth')
 @Controller('api/auth/google')
 export class GoogleAuthController {
@@ -30,7 +33,8 @@ export class GoogleAuthController {
   })
   @ApiResponse({
     status: 302,
-    description: 'Redirects to frontend with tokens in query params',
+    description:
+      'Sets refresh token in an HttpOnly cookie and redirects to the frontend',
   })
   async googleCallback(
     @Req() req: Request,
@@ -47,9 +51,22 @@ export class GoogleAuthController {
     const frontendUrl =
       this.config.get('CORS_ORIGIN', { infer: true }) ??
       'http://localhost:3000';
+    const isProduction =
+      this.config.get('NODE_ENV', { infer: true }) === 'production';
+
+    // The refresh token is sensitive — never expose it via URL (browser
+    // history, referrers, server logs). It travels in an HttpOnly cookie
+    // scoped to the API and the frontend reads it back via /auth/refresh.
+    res.cookie(REFRESH_COOKIE_NAME, tokens.refreshToken, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: 'lax',
+      path: '/api/auth',
+      maxAge: REFRESH_COOKIE_MAX_AGE_MS,
+    });
+
     const redirect = new URL('/auth/callback', frontendUrl);
     redirect.searchParams.set('accessToken', tokens.accessToken);
-    redirect.searchParams.set('refreshToken', tokens.refreshToken);
     redirect.searchParams.set('userId', user.id);
 
     res.redirect(redirect.toString());
