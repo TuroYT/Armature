@@ -62,7 +62,7 @@
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@nestjs/cli": "^11.0.21",
     "@nestjs/schematics": "^11.1.0",
-    "@nestjs/testing": "^11.1.19",
+    "@nestjs/testing": "^11.1.21",
     "@types/bcryptjs": "^2.4.6",
     "@types/cookie-parser": "^1.4.10",
     "@types/express": "^5.0.0",
@@ -86,9 +86,9 @@
     "supertest": "^7.0.0",
     "ts-jest": "^29.4.9",
     "ts-node": "^10.9.2",
-    "tsx": "^4.21.0",
+    "tsx": "^4.22.2",
     "typescript": "^5.7.3",
-    "typescript-eslint": "^8.59.3"
+    "typescript-eslint": "^8.59.4"
   },
   "overrides": {
     "@nestjs/mapped-types": {
