@@ -6,6 +6,9 @@
   "private": true,
   "license": "MIT",
   "type": "module",
+  "workspaces": [
+    "sdk"
+  ],
   "scripts": {
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",

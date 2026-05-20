@@ -4,22 +4,32 @@ The Armature SDK is a typed TypeScript client that wraps the REST API and WebSoc
 
 ## Installation
 
-=== "Monorepo (local)"
-    ```bash
-    # From your app, reference the sdk/ package directly
-    npm install ../sdk
-    ```
+The SDK uses **npm workspaces** — `armature-sdk` is available to every app inside the monorepo without publishing to a registry.
 
-=== "npm (after publish)"
-    ```bash
+=== "App inside the monorepo"
+Add `armature-sdk` to your app's `package.json`:
+`json
+    { "dependencies": { "armature-sdk": "*" } }
+    `
+Then run `npm install` at the **monorepo root** once — npm workspaces link it automatically.
+
+=== "External project (file path)"
+`bash
+    npm install /path/to/Armature/sdk
+    `
+
+=== "After publishing to npm"
+`bash
+    cd sdk && npm run build && npm publish
+    # consumers then:
     npm install armature-sdk
-    ```
+    `
 
 ## Quick start
 
 === "React / Vite"
-    ```typescript
-    import { ArmatureClient } from 'armature-sdk';
+```typescript
+import { ArmatureClient } from 'armature-sdk';
 
     const client = new ArmatureClient({
       baseUrl: import.meta.env.VITE_API_URL,
@@ -41,9 +51,9 @@ The Armature SDK is a typed TypeScript client that wraps the REST API and WebSoc
     ```
 
 === "Next.js"
-    ```typescript
-    // lib/sdk.ts
-    import { ArmatureClient } from 'armature-sdk';
+```typescript
+// lib/sdk.ts
+import { ArmatureClient } from 'armature-sdk';
 
     export const sdk = new ArmatureClient({
       baseUrl: process.env.NEXT_PUBLIC_API_URL!,
@@ -54,8 +64,8 @@ The Armature SDK is a typed TypeScript client that wraps the REST API and WebSoc
     ```
 
 === "Node.js"
-    ```typescript
-    import { ArmatureClient } from 'armature-sdk';
+```typescript
+import { ArmatureClient } from 'armature-sdk';
 
     const client = new ArmatureClient({ baseUrl: 'http://localhost:3000' });
     await client.auth.login({ email: 'admin@example.com', password: 'password' });
@@ -89,7 +99,7 @@ sequenceDiagram
 ```
 
 !!! tip "Persisting tokens"
-    Pass `onTokensRefreshed` to keep tokens in sync with your storage layer (localStorage, cookies, Zustand, etc.):
+Pass `onTokensRefreshed` to keep tokens in sync with your storage layer (localStorage, cookies, Zustand, etc.):
 
     ```typescript
     const client = new ArmatureClient({
@@ -101,7 +111,7 @@ sequenceDiagram
     ```
 
 !!! warning "Token expiry on page reload"
-    Tokens are in-memory only. Call `client.setTokens(...)` on startup to restore a previous session.
+Tokens are in-memory only. Call `client.setTokens(...)` on startup to restore a previous session.
 
 ---
 
@@ -128,18 +138,18 @@ const methods = await client.auth.methods();
 ### OAuth providers
 
 === "Redirect"
-    ```typescript
+`typescript
     // Redirects the browser to the provider consent screen
     client.auth.socialRedirect('google');
-    ```
+    `
 
 === "Callback"
-    ```typescript
+`typescript
     // On the callback page, extract the token from the URL
     // e.g. https://yourapp.com/auth/callback?accessToken=xxx&userId=yyy
     const token = client.auth.handleOAuthCallback();
     // token is stored in the client automatically
-    ```
+    `
 
 ---
 
@@ -147,16 +157,25 @@ const methods = await client.auth.methods();
 
 ```typescript
 // List (paginated + search)
-const { data, meta } = await client.resources.list({ page: 1, limit: 20, q: 'search' });
+const { data, meta } = await client.resources.list({
+  page: 1,
+  limit: 20,
+  q: 'search',
+});
 
 // Get by ID
 const resource = await client.resources.get('resource-id');
 
 // Create (requires resources:write permission)
-const created = await client.resources.create({ name: 'My resource', description: 'optional' });
+const created = await client.resources.create({
+  name: 'My resource',
+  description: 'optional',
+});
 
 // Update (owner or admin)
-const updated = await client.resources.update('resource-id', { name: 'New name' });
+const updated = await client.resources.update('resource-id', {
+  name: 'New name',
+});
 
 // Delete (admin only)
 await client.resources.delete('resource-id');
@@ -188,10 +207,10 @@ ws.disconnect();
 ```
 
 !!! note "Authentication"
-    `client.realtime()` reads the current `accessToken` from memory. Call it **after** a successful login or `setTokens()`.
+`client.realtime()` reads the current `accessToken` from memory. Call it **after** a successful login or `setTokens()`.
 
 !!! warning "connect_error vs error"
-    Auth failures surface as `connect_error`, **not** `error`. Always listen to both events when debugging connection issues.
+Auth failures surface as `connect_error`, **not** `error`. Always listen to both events when debugging connection issues.
 
 ---
 
@@ -232,8 +251,8 @@ npm run build
 ```
 
 !!! tip "Generated files"
-    Never edit files inside `sdk/src/generated/` — they are overwritten on every `npm run generate`.
-    Put hand-written customisations in `sdk/src/modules/` instead.
+Never edit files inside `sdk/src/generated/` — they are overwritten on every `npm run generate`.
+Put hand-written customisations in `sdk/src/modules/` instead.
 
 ---
 
@@ -249,16 +268,16 @@ try {
 } catch (err) {
   if (err instanceof ArmatureError) {
     console.log(err.status); // 404
-    console.log(err.code);   // "RESOURCE_NOT_FOUND"
+    console.log(err.code); // "RESOURCE_NOT_FOUND"
     console.log(err.message); // translated message
   }
 }
 ```
 
-| `code` | `status` | Meaning |
-|--------|----------|---------|
-| `UNAUTHORIZED` | 401 | Missing or expired token (after refresh failed) |
-| `FORBIDDEN` | 403 | Insufficient permissions |
-| `RESOURCE_NOT_FOUND` | 404 | Entity does not exist |
-| `CONFLICT` | 409 | Duplicate (e.g. email already in use) |
-| `UNKNOWN_ERROR` | — | Unexpected server error |
+| `code`               | `status` | Meaning                                         |
+| -------------------- | -------- | ----------------------------------------------- |
+| `UNAUTHORIZED`       | 401      | Missing or expired token (after refresh failed) |
+| `FORBIDDEN`          | 403      | Insufficient permissions                        |
+| `RESOURCE_NOT_FOUND` | 404      | Entity does not exist                           |
+| `CONFLICT`           | 409      | Duplicate (e.g. email already in use)           |
+| `UNKNOWN_ERROR`      | —        | Unexpected server error                         |
