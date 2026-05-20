@@ -25,7 +25,7 @@ export class AuthOAuthMixin {
     const accessToken = params.get('accessToken');
 
     if (accessToken) {
-      const tokens = { accessToken, refreshToken: '' };
+      const tokens = { accessToken };
       this.http.setTokens(tokens);
     }
 
