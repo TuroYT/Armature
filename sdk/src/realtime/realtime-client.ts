@@ -9,7 +9,7 @@ type RealtimeEventMap = {
   'resource:deleted': { id: string };
   pong: PongDto;
   connect: void;
-  disconnect: void;
+  disconnect: string;
   connect_error: Error;
   error: { message: string };
 };
