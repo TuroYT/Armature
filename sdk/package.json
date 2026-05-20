@@ -17,7 +17,7 @@
     "dist"
   ],
   "scripts": {
-    "generate": "ARMATURE_BASE_URL=${ARMATURE_BASE_URL:-http://localhost:3000} node --loader ../node_modules/tsx/dist/esm/index.cjs scripts/generate.ts",
+    "generate": "node --loader ../node_modules/tsx/dist/esm/index.cjs scripts/generate.ts",
     "build": "tsup",
     "test": "NODE_OPTIONS=--experimental-vm-modules ../node_modules/.bin/jest --config jest.config.js",
     "typecheck": "tsc --noEmit"
