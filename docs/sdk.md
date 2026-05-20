@@ -138,18 +138,20 @@ const methods = await client.auth.methods();
 ### OAuth providers
 
 === "Redirect"
-`typescript
+
+    ```typescript
     // Redirects the browser to the provider consent screen
     client.auth.socialRedirect('google');
-    `
+    ```
 
 === "Callback"
-`typescript
+
+    ```typescript
     // On the callback page, extract the token from the URL
     // e.g. https://yourapp.com/auth/callback?accessToken=xxx&userId=yyy
     const token = client.auth.handleOAuthCallback();
     // token is stored in the client automatically
-    `
+    ```
 
 ---
 
