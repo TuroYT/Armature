@@ -8,10 +8,12 @@ The SDK uses **npm workspaces** — `armature-sdk` is available to every app ins
 
 === "App inside the monorepo"
 Add `armature-sdk` to your app's `package.json`:
-`json
+
+    ```json
     { "dependencies": { "armature-sdk": "*" } }
-    `
-Then run `npm install` at the **monorepo root** once — npm workspaces link it automatically.
+    ```
+
+    Then run `npm install` at the **monorepo root** once — npm workspaces link it automatically.
 
 === "External project (file path)"
 `bash

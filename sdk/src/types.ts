@@ -1,6 +1,6 @@
 export interface TokensDto {
   accessToken: string;
-  refreshToken: string;
+  refreshToken?: string | null;
 }
 
 export interface PaginationMeta {

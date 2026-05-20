@@ -10,7 +10,7 @@ export class HttpClient {
 
   setTokens(tokens: TokensDto): void {
     this.accessToken = tokens.accessToken;
-    this.refreshToken = tokens.refreshToken;
+    this.refreshToken = tokens.refreshToken ?? null;
   }
 
   getTokens(): { accessToken: string | null; refreshToken: string | null } {
@@ -45,7 +45,9 @@ export class HttpClient {
     body?: unknown,
     skipAuth = false,
   ): Promise<Response> {
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
     if (!skipAuth && this.accessToken) {
       headers['Authorization'] = `Bearer ${this.accessToken}`;
     }
