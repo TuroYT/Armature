@@ -60,3 +60,6 @@ mcp/node_modules/
 
 # Dev
 .vscode
+# SDK build artifacts
+sdk/dist/
+sdk/node_modules/

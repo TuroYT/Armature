@@ -1,0 +1,35 @@
+{
+  "name": "armature-sdk",
+  "version": "0.1.0",
+  "description": "TypeScript client SDK for Armature — auto-generated from OpenAPI spec",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "generate": "node --loader ../node_modules/tsx/dist/esm/index.cjs scripts/generate.ts",
+    "build": "tsup",
+    "test": "NODE_OPTIONS=--experimental-vm-modules ../node_modules/.bin/jest --config jest.config.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "socket.io-client": "^4.8.3"
+  },
+  "devDependencies": {
+    "@types/node": "*",
+    "tsup": "^8.0.0"
+  },
+  "peerDependencies": {
+    "typescript": ">=5.0.0"
+  }
+}

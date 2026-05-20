@@ -81,3 +81,4 @@ nav:
   - Integrations:
     - Adding a Social Provider: adding-social-provider.md
     - MCP Server: mcp.md
+    - SDK Client: sdk.md

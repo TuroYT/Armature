@@ -6,6 +6,9 @@
   "private": true,
   "license": "MIT",
   "type": "module",
+  "workspaces": [
+    "sdk"
+  ],
   "scripts": {
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
@@ -86,6 +89,7 @@
     "supertest": "^7.0.0",
     "ts-jest": "^29.4.9",
     "ts-node": "^10.9.2",
+    "tsup": "^8.5.1",
     "tsx": "^4.22.2",
     "typescript": "^5.7.3",
     "typescript-eslint": "^8.59.4"
