@@ -230,7 +230,8 @@ function renderMethod(m: MethodDef): string {
     for (const qp of m.queryParams) {
       body += `    if (query?.${qp.name} !== undefined) params.set('${qp.name}', String(query.${qp.name}));\n`;
     }
-    pathExpr = `\`${m.path.replace(/{(\w+)}/g, '${$1}')}?\${params}\``;
+    body += `    const queryString = params.toString();\n`;
+    pathExpr = `queryString ? \`${m.path.replace(/{(\w+)}/g, '${$1}')}?\${queryString}\` : \`${m.path.replace(/{(\w+)}/g, '${$1}')}\``;
   }
 
   const skipAuth = m.isPublic ? ', true' : '';
