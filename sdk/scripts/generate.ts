@@ -245,9 +245,10 @@ function renderMethod(m: MethodDef): string {
       body += `    return this.http.post<${m.returnType}>(${pathExpr}${httpArgs}${skipAuth});`;
       break;
     case 'patch':
-    case 'put':
       body += `    return this.http.patch<${m.returnType}>(${pathExpr}${httpArgs});`;
       break;
+    case 'put':
+      throw new Error(`PUT operations are not supported by the generated HttpClient: ${m.name} (${m.path})`);
     case 'delete':
       body += `    return this.http.delete<void>(${pathExpr});`;
       break;
