@@ -34,7 +34,7 @@ export class GoogleAuthController {
   @ApiResponse({
     status: 302,
     description:
-      'Sets refresh token in an HttpOnly cookie and redirects to the frontend',
+      'Sets both tokens in HttpOnly cookies and redirects to the frontend',
   })
   async googleCallback(
     @Req() req: Request,
@@ -42,7 +42,6 @@ export class GoogleAuthController {
   ): Promise<void> {
     const googleUser = req.user as { id: string; email: string };
 
-    const user = await this.authService.getMe(googleUser.id);
     const tokens = await this.authService.issueTokensForUser(
       googleUser.id,
       googleUser.email,
@@ -54,21 +53,28 @@ export class GoogleAuthController {
     const isProduction =
       this.config.get('NODE_ENV', { infer: true }) === 'production';
 
-    // The refresh token is sensitive — never expose it via URL (browser
-    // history, referrers, server logs). It travels in an HttpOnly cookie
-    // scoped to the API and the frontend reads it back via /auth/refresh.
-    res.cookie(REFRESH_COOKIE_NAME, tokens.refreshToken, {
+    const cookieOptions = {
       httpOnly: true,
       secure: isProduction,
-      sameSite: 'lax',
+      sameSite: 'lax' as const,
       path: '/api/auth',
       maxAge: REFRESH_COOKIE_MAX_AGE_MS,
+    };
+
+    // Both tokens travel as HttpOnly cookies — neither ever appears in a URL,
+    // browser history, Referer header, or server log.
+    // The access token cookie is readable only via /api/* requests (path scope).
+    // The refresh token is scoped to /api/auth to limit its exposure surface.
+    res.cookie(REFRESH_COOKIE_NAME, tokens.refreshToken, cookieOptions);
+    res.cookie('armature_access_token', tokens.accessToken, {
+      ...cookieOptions,
+      // Access token is short-lived — align cookie expiry with JWT expiry (15 min default).
+      maxAge: 15 * 60 * 1000,
+      path: '/api',
     });
 
+    // Redirect to the frontend callback route. No tokens in the URL.
     const redirect = new URL('/auth/callback', frontendUrl);
-    redirect.searchParams.set('accessToken', tokens.accessToken);
-    redirect.searchParams.set('userId', user.id);
-
     res.redirect(redirect.toString());
   }
 }

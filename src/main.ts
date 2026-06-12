@@ -23,12 +23,26 @@ function getPackageVersion(): string {
 }
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  // rawBody: true is required for Stripe webhook signature verification —
+  // constructEvent() needs the raw Buffer, not the parsed JSON body.
+  const app = await NestFactory.create(AppModule, {
+    bufferLogs: true,
+    rawBody: true,
+  });
 
   const config = app.get(ConfigService<Env, true>);
   const port = config.get('PORT', { infer: true });
   const corsOrigin = config.get('CORS_ORIGIN', { infer: true });
   const isProduction = config.get('NODE_ENV', { infer: true }) === 'production';
+
+  // Require an explicit CORS origin in production — reflecting every origin with
+  // credentials enabled is a CSRF vector that misconfiguration can accidentally ship.
+  if (isProduction && !corsOrigin) {
+    throw new Error(
+      'CORS_ORIGIN must be set in production. ' +
+        'Set it to your frontend URL (e.g. https://app.example.com).',
+    );
+  }
 
   // ── WebSocket adapter ─────────────────────────────────────────────────────
   app.useWebSocketAdapter(new WsAdapter(app));
@@ -53,7 +67,9 @@ async function bootstrap() {
     new ValidationPipe({
       whitelist: true,
       transform: true,
-      forbidNonWhitelisted: false,
+      // Reject payloads that contain properties not declared in the DTO.
+      // Prevents accidental mass-assignment via unknown fields leaking through.
+      forbidNonWhitelisted: true,
     }),
   );
 

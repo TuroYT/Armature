@@ -17,6 +17,9 @@ export const fr: Record<ErrorCode, string> = {
   // Users
   USER_NOT_FOUND: 'Utilisateur introuvable',
   USER_ALREADY_EXISTS: 'Un compte avec cet email existe déjà',
+  PASSWORD_TOO_WEAK:
+    'Le mot de passe doit faire au moins 8 caractères et contenir une majuscule, une minuscule et un chiffre ou caractère spécial',
+  EMAIL_NOT_VERIFIED: "L'adresse email n'a pas été vérifiée par le fournisseur",
 
   // Permissions
   INSUFFICIENT_PERMISSIONS:

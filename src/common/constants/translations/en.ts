@@ -17,6 +17,9 @@ export const en: Record<ErrorCode, string> = {
   // Users
   USER_NOT_FOUND: 'User not found',
   USER_ALREADY_EXISTS: 'An account with this email already exists',
+  PASSWORD_TOO_WEAK:
+    'Password must be at least 8 characters and contain uppercase, lowercase, and a digit or special character',
+  EMAIL_NOT_VERIFIED: 'Email address has not been verified by the provider',
 
   // Permissions
   INSUFFICIENT_PERMISSIONS: 'You do not have permission to perform this action',

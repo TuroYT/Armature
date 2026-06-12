@@ -51,16 +51,27 @@ model OAuthAccount {
 }
 
 /// Hashed refresh token — one user can hold multiple active sessions (multi-device).
+///
+/// Rotation strategy (reuse detection):
+///   - Tokens are marked `used = true` on rotation rather than deleted immediately.
+///   - If a `used` token is presented again, the entire `family` is revoked so the
+///     legitimate holder's new token is also invalidated — forcing re-authentication.
+///   - Expired tokens are purged lazily during each refresh / logout call.
 model RefreshToken {
   id        String   @id @default(cuid())
   tokenHash String   @unique
   expiresAt DateTime
+  /// True once this token has been rotated. Kept briefly to detect replay attacks.
+  used      Boolean  @default(false)
+  /// Groups a chain of rotated tokens. Revoking the family invalidates all derived tokens.
+  family    String   @default(cuid())
   createdAt DateTime @default(now())
 
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([family])
   @@map("refresh_tokens")
 }
 

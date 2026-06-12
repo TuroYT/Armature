@@ -19,6 +19,17 @@ export class PaymentModule {
       return { module: PaymentModule };
     }
 
+    // STRIPE_WEBHOOK_SECRET is required when Stripe is active: without it,
+    // constructEvent() cannot verify webhook signatures and the endpoint
+    // silently accepts forged payloads (subscription spoofing, billing fraud).
+    if (!process.env['STRIPE_WEBHOOK_SECRET']) {
+      new Logger('PaymentModule').error(
+        'STRIPE_WEBHOOK_SECRET is not set. ' +
+          'The /api/payment/webhook endpoint will reject every Stripe request. ' +
+          'Generate a webhook secret in the Stripe dashboard and set it.',
+      );
+    }
+
     return {
       module: PaymentModule,
       controllers: [PaymentController],

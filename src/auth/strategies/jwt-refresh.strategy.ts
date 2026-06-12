@@ -14,6 +14,28 @@ export interface RefreshTokenUser {
   refreshToken: string;
 }
 
+const REFRESH_COOKIE_NAME = 'armature_refresh_token';
+
+/**
+ * Extracts the refresh token JWT from:
+ * 1. `refreshToken` field in the request body (explicit /auth/refresh call)
+ * 2. `armature_refresh_token` HttpOnly cookie (set by Google OAuth callback)
+ *
+ * Body takes precedence so that explicit API clients (mobile, server-to-server)
+ * are unaffected by cookie presence.
+ */
+function extractRefreshToken(req: Request): string | null {
+  const body = req.body as Record<string, unknown> | undefined;
+  const bodyToken = body?.['refreshToken'];
+  if (typeof bodyToken === 'string' && bodyToken.length > 0) return bodyToken;
+
+  const cookies = req.cookies as Record<string, unknown> | undefined;
+  const cookieToken = cookies?.[REFRESH_COOKIE_NAME];
+  return typeof cookieToken === 'string' && cookieToken.length > 0
+    ? cookieToken
+    : null;
+}
+
 @Injectable()
 export class JwtRefreshStrategy extends PassportStrategy(
   Strategy,
@@ -21,7 +43,7 @@ export class JwtRefreshStrategy extends PassportStrategy(
 ) {
   constructor(config: ConfigService<Env, true>) {
     super({
-      jwtFromRequest: ExtractJwt.fromBodyField('refreshToken'),
+      jwtFromRequest: ExtractJwt.fromExtractors([extractRefreshToken]),
       ignoreExpiration: false,
       secretOrKey: config.get('JWT_REFRESH_SECRET', { infer: true }),
       passReqToCallback: true,
@@ -29,10 +51,9 @@ export class JwtRefreshStrategy extends PassportStrategy(
   }
 
   validate(req: Request, payload: JwtPayload): RefreshTokenUser {
-    const body = req.body as Record<string, unknown>;
-    const refreshToken = body['refreshToken'];
+    const refreshToken = extractRefreshToken(req);
 
-    if (!refreshToken || typeof refreshToken !== 'string') {
+    if (!refreshToken) {
       throw new UnauthorizedException(ErrorCode.INVALID_REFRESH_TOKEN);
     }
 

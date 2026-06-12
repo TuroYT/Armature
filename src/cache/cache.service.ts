@@ -100,11 +100,29 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  /** Invalidate all keys matching a pattern. Use sparingly — O(N) on keyspace. */
+  /**
+   * Invalidate all keys matching a pattern.
+   *
+   * Uses SCAN (non-blocking, O(N) amortised across multiple calls) instead of
+   * KEYS (which blocks the entire Redis event loop for the full scan duration).
+   */
   async invalidatePattern(pattern: string): Promise<void> {
     if (!this.client) return;
     try {
-      const keys = await this.client.keys(pattern);
+      const keys: string[] = [];
+      let cursor = '0';
+      do {
+        const [nextCursor, batch] = await this.client.scan(
+          cursor,
+          'MATCH',
+          pattern,
+          'COUNT',
+          100,
+        );
+        cursor = nextCursor;
+        keys.push(...batch);
+      } while (cursor !== '0');
+
       if (keys.length > 0) await this.client.del(...keys);
     } catch (err) {
       this.logger.warn('Cache invalidatePattern failed', {

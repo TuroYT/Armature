@@ -8,6 +8,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import bcrypt from 'bcryptjs';
+import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { LoggerService } from '../common/logger/logger.service.js';
 import { ErrorCode } from '../common/constants/error-constants.js';
@@ -97,6 +98,9 @@ export class AuthService {
 
     this.logger.log('User logged in', { userId: user.id });
 
+    // Purge expired tokens on login to keep the table size bounded.
+    await this.pruneExpiredTokens(user.id);
+
     const roleNames = user.userRoles.map((ur) => ur.role.name);
     const tokens = await this.generateAndStoreTokens(
       user.id,
@@ -110,32 +114,66 @@ export class AuthService {
     userId: string,
     incomingToken: string,
   ): Promise<TokensResponseDto> {
-    const storedTokens = await this.prisma.refreshToken.findMany({
-      where: { userId, expiresAt: { gt: new Date() } },
+    // Load ALL tokens for the user, including already-used ones.
+    // Used tokens are retained briefly to detect replay attacks (reuse detection).
+    const allTokens = await this.prisma.refreshToken.findMany({
+      where: { userId },
     });
 
-    let matchedTokenId: string | null = null;
-    for (const stored of storedTokens) {
+    let matchedToken: (typeof allTokens)[0] | null = null;
+    for (const stored of allTokens) {
       if (await bcrypt.compare(incomingToken, stored.tokenHash)) {
-        matchedTokenId = stored.id;
+        matchedToken = stored;
         break;
       }
     }
 
-    if (!matchedTokenId) {
+    if (!matchedToken) {
       throw new UnauthorizedException(ErrorCode.INVALID_REFRESH_TOKEN);
     }
+
+    // Reuse detected: this token was already rotated.
+    // Revoke the entire token family — the legitimate holder's current token is
+    // also invalidated, forcing re-authentication. This limits the damage window
+    // when a refresh token has been stolen and replayed.
+    if (matchedToken.used) {
+      await this.prisma.refreshToken.deleteMany({
+        where: { userId, family: matchedToken.family },
+      });
+      this.logger.warn('Refresh token reuse detected — family revoked', {
+        userId,
+        family: matchedToken.family,
+      });
+      throw new UnauthorizedException(ErrorCode.INVALID_REFRESH_TOKEN);
+    }
+
+    if (matchedToken.expiresAt <= new Date()) {
+      throw new UnauthorizedException(ErrorCode.INVALID_REFRESH_TOKEN);
+    }
+
+    // Mark as used instead of deleting — keeps the record alive for the reuse
+    // detection window (until its natural expiry).
+    await this.prisma.refreshToken.update({
+      where: { id: matchedToken.id },
+      data: { used: true },
+    });
+
+    // Purge fully expired tokens for this user (housekeeping).
+    await this.pruneExpiredTokens(userId);
 
     const user = await this.prisma.user.findUniqueOrThrow({
       where: { id: userId },
       include: { userRoles: { include: { role: true } } },
     });
 
-    // Delete the used token before issuing new ones (prevents reuse)
-    await this.prisma.refreshToken.delete({ where: { id: matchedTokenId } });
-
     const roleNames = user.userRoles.map((ur) => ur.role.name);
-    return this.generateAndStoreTokens(user.id, user.email, roleNames);
+    // Inherit the token family so reuse detection spans the full rotation chain.
+    return this.generateAndStoreTokens(
+      user.id,
+      user.email,
+      roleNames,
+      matchedToken.family,
+    );
   }
 
   async logout(userId: string, refreshToken: string): Promise<void> {
@@ -149,6 +187,9 @@ export class AuthService {
         break;
       }
     }
+
+    // Purge expired tokens while we're here.
+    await this.pruneExpiredTokens(userId);
   }
 
   /**
@@ -212,10 +253,19 @@ export class AuthService {
     });
   }
 
+  /** Delete all expired tokens for a user. Called lazily on login/refresh/logout. */
+  private pruneExpiredTokens(userId: string): Promise<{ count: number }> {
+    return this.prisma.refreshToken.deleteMany({
+      where: { userId, expiresAt: { lt: new Date() } },
+    });
+  }
+
   private async generateAndStoreTokens(
     userId: string,
     email: string,
     roles: string[],
+    /** Rotation chain identifier. Omit to start a new chain (first login). */
+    family?: string,
   ): Promise<TokensResponseDto> {
     const payload: JwtPayload = { sub: userId, email, roles };
 
@@ -232,9 +282,11 @@ export class AuthService {
 
     const tokenHash = await bcrypt.hash(refreshToken, 10);
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    // New family on first issue; inherited family on rotation.
+    const tokenFamily = family ?? randomUUID();
 
     await this.prisma.refreshToken.create({
-      data: { userId, tokenHash, expiresAt },
+      data: { userId, tokenHash, expiresAt, family: tokenFamily },
     });
 
     return { accessToken, refreshToken };

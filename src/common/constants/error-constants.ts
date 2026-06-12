@@ -23,6 +23,8 @@ export const ErrorCode = {
   // ─── Users ────────────────────────────────────────────────────────────────
   USER_NOT_FOUND: 'USER_NOT_FOUND',
   USER_ALREADY_EXISTS: 'USER_ALREADY_EXISTS',
+  PASSWORD_TOO_WEAK: 'PASSWORD_TOO_WEAK',
+  EMAIL_NOT_VERIFIED: 'EMAIL_NOT_VERIFIED',
 
   // ─── Permissions ──────────────────────────────────────────────────────────
   INSUFFICIENT_PERMISSIONS: 'INSUFFICIENT_PERMISSIONS',

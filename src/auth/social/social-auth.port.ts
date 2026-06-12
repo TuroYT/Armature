@@ -12,6 +12,12 @@ export interface SocialProfile {
   /** OAuth provider slug: "google" | "github" | "apple" | ... */
   provider: string;
   email: string;
+  /**
+   * Whether the provider has verified this email address.
+   * Must be `true` — unverified emails are rejected by SocialAuthService to
+   * prevent account-takeover via email pre-registration across providers.
+   */
+  emailVerified: boolean;
   firstName?: string | null;
   lastName?: string | null;
   avatarUrl?: string | null;

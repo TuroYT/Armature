@@ -22,6 +22,12 @@ import { WsPolicyRegistry } from './policies/ws-policy.registry.js';
 import { ErrorCode } from '../common/constants/error-constants.js';
 import type { AuthUser, JwtPayload } from '../auth/strategies/jwt.strategy.js';
 
+/** Per-socket event rate tracking entry. */
+interface RateEntry {
+  count: number;
+  resetAt: number;
+}
+
 /**
  * Central WebSocket gateway.
  *
@@ -86,6 +92,10 @@ export class WebsocketGateway
   private readonly server: Server;
 
   private readonly logger: LoggerService;
+
+  // Per-socket rate limiter: max events per window per socket.
+  // Cleaned up in handleDisconnect to prevent memory leaks.
+  private readonly socketEventRates = new Map<string, RateEntry>();
 
   constructor(
     private readonly jwtService: JwtService,
@@ -170,8 +180,9 @@ export class WebsocketGateway
     // Override to add post-connect logic (e.g. presence tracking, room auto-join).
   }
 
-  handleDisconnect(): void {
-    // Override to add teardown logic (e.g. presence tracking).
+  handleDisconnect(client: Socket): void {
+    // Release per-socket rate-limit state to prevent memory leaks on long-lived servers.
+    this.socketEventRates.delete(client.id);
   }
 
   // ── Server → Client helpers ─────────────────────────────────────────────────
@@ -259,8 +270,10 @@ export class WebsocketGateway
   @UseGuards(WsJwtGuard)
   @SubscribeMessage('ping')
   handlePing(
+    @ConnectedSocket() client: Socket,
     @WsCurrentUser() user: AuthUser,
   ): WsResponse<{ userId: string; timestamp: string }> {
+    this.enforceRateLimit(client.id, 'ping', 30);
     return {
       event: 'pong',
       data: { userId: user.id, timestamp: new Date().toISOString() },
@@ -283,6 +296,7 @@ export class WebsocketGateway
     @WsCurrentUser() user: AuthUser,
   ): Promise<void> {
     if (!body?.room) throw new WsException(ErrorCode.BAD_REQUEST);
+    this.enforceRateLimit(client.id, 'subscribe', 20);
 
     const roomPolicy = this.policyRegistry.getRoomPolicy(body.room);
     if (roomPolicy && !(await roomPolicy(user))) {
@@ -306,6 +320,38 @@ export class WebsocketGateway
     @ConnectedSocket() client: Socket,
   ): Promise<void> {
     if (!body?.room) throw new WsException(ErrorCode.BAD_REQUEST);
+    this.enforceRateLimit(client.id, 'unsubscribe', 20);
     await client.leave(body.room);
+  }
+
+  // ── Per-socket rate limiting ────────────────────────────────────────────────
+
+  /**
+   * Enforces a per-socket event rate limit (sliding window, 60-second bucket).
+   * Throws WsException(FORBIDDEN) when the limit is exceeded.
+   *
+   * @param socketId  Unique socket identifier (cleaned up on disconnect).
+   * @param event     Event name used as part of the map key.
+   * @param maxPerMin Maximum number of events allowed per 60-second window.
+   */
+  private enforceRateLimit(
+    socketId: string,
+    event: string,
+    maxPerMin: number,
+  ): void {
+    const key = `${socketId}:${event}`;
+    const now = Date.now();
+    const entry = this.socketEventRates.get(key);
+
+    if (!entry || entry.resetAt < now) {
+      this.socketEventRates.set(key, { count: 1, resetAt: now + 60_000 });
+      return;
+    }
+
+    if (entry.count >= maxPerMin) {
+      throw new WsException(ErrorCode.FORBIDDEN);
+    }
+
+    entry.count++;
   }
 }

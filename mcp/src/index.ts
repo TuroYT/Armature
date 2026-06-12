@@ -30,7 +30,8 @@ function loadSession(): Session | null {
 }
 
 function saveSession(session: Session): void {
-  writeFileSync(SESSION_FILE, JSON.stringify(session, null, 2), 'utf-8');
+  // mode 0o600: owner read/write only — prevents other OS users from reading JWT tokens.
+  writeFileSync(SESSION_FILE, JSON.stringify(session, null, 2), { encoding: 'utf-8', mode: 0o600 });
 }
 
 function clearSession(): void {
